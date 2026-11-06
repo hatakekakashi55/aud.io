@@ -18,7 +18,7 @@ import kotlin.random.Random
 
 /**
  * The signature AUD seek bar: a deterministic "tape waveform" —
- * 64 brass levels generated from the track id, drawn as vertical ticks.
+ * 64 primary-colour levels generated from the track id, drawn as vertical ticks.
  * Tap or drag to scrub. Deliberately not a stock Material slider.
  */
 @Composable
@@ -64,7 +64,7 @@ fun WaveformBar(
             val h = bars[i] * size.height * 0.88f
             val played = x <= progressX
             drawLine(
-                color = if (played) Ink.Brass else Ink.Line,
+                color = if (played) Ink.Primary else Ink.Line,
                 start = Offset(x, midY - h / 2f),
                 end = Offset(x, midY + h / 2f),
                 strokeWidth = barWidth,

@@ -6,6 +6,9 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Catalog service — talks to the live AUD music service over plain HTTPS.
@@ -13,6 +16,16 @@ import java.net.URLEncoder
  * exactly the same from any device with connectivity.
  *
  *   GET {BASE}/api/search/songs?query=<q>  →  {"data":{"results":[ … ]}}
+ *
+ * The catalog is hydrated from a **Tamil-first shelf of seed queries** — Tamil
+ * cinema's composers and eras come first, then a handful of other languages so
+ * the home feed still feels like a world of music rather than one region.
+ * Every seed doubles as a live editorial mix, and the union is far larger than
+ * the old 12-query catalog, which is what made the feed feel "limited".
+ *
+ * Queries run in parallel on a small pool (same idea as the web client), so a
+ * bigger shelf does not mean a slower boot. Partial success is normal: a mix
+ * only disappears if its own query came back empty.
  *
  * The catalog is cached on-device for [CACHE_TTL_MS]; a stale cache is only
  * used when the network is unreachable (so the app still opens offline).
@@ -24,25 +37,55 @@ object CatalogService {
     const val BASE = "https://aud29.thangamprabhu1.workers.dev"
 
     private const val CACHE_PREFS = "aud_catalog_cache"
-    private const val CACHE_KEY = "catalog_v1"
+    private const val CACHE_KEY = "catalog_v2"
     private const val CACHE_TTL_MS = 15L * 60L * 1000L
-    private const val CACHE_VERSION = 1
+    private const val CACHE_VERSION = 2
 
-    /** Editorial seed mixes — worldwide spread with a local shelf. */
-    /** Worldwide shelf — global genres first, home turf last. */
+    /** How many tracks each seed contributes to its mix (and to the union). */
+    private const val TRACKS_PER_MIX = 20
+
+    /** Below this the catalog is too thin to feel like a real home feed. */
+    private const val MIN_TRACKS = 40
+    private const val MIN_MIXES = 3
+
+    private const val PARALLELISM = 8
+
+    /**
+     * The shelf. **Tamil first** — roughly two thirds of the seeds — then a
+     * short worldwide tail. Order matters: it is the order of the home rails,
+     * and the order used to interleave the "fresh ears" feed.
+     */
     private val SEEDS = listOf(
-        "Global Top 40" to "top 40 hits",
-        "Pop Essentials" to "pop hits 2024",
-        "Hip-Hop Heat" to "hip hop hits",
-        "Electronic Pulse" to "edm hits",
-        "R&B Slow Jams" to "r&b hits",
-        "Latin Fuego" to "latin hits",
-        "K-Pop Wave" to "kpop hits",
-        "Bollywood Brass" to "bollywood hits",
-        "Rahman Files" to "a r rahman",
-        "Ilaiyaraaja: Maestro" to "ilaiyaraaja",
-        "Love on Loop (Tamil)" to "tamil love songs",
-        "Fresh Ink" to "latest tamil",
+        // ── Tamil ────────────────────────────────────────────────────────
+        "Tamil Top 40" to "tamil hits",
+        "Anirudh" to "anirudh ravichander hits",
+        "A. R. Rahman" to "a r rahman tamil hits",
+        "Ilaiyaraaja" to "ilaiyaraaja tamil hits",
+        "Tamil Love" to "tamil love songs",
+        "Kuthu & Mass" to "kuthu songs tamil",
+        "Melody Nights" to "tamil melody hits",
+        "Yuvan Shankar Raja" to "yuvan shankar raja hits",
+        "Harris Jayaraj" to "harris jayaraj hits",
+        "Santhosh Narayanan" to "santhosh narayanan songs",
+        "G. V. Prakash" to "gv prakash kumar songs",
+        "Tamil Sad" to "sad tamil songs",
+        "90s Tamil Gold" to "ilaiyaraaja 90s tamil songs",
+        "Vijay Hits" to "vijay songs tamil",
+        "Ajith Hits" to "ajith kumar songs tamil",
+        "Dhanush" to "dhanush songs tamil",
+        "Kollywood Fresh" to "latest tamil songs 2024",
+        "Tamil Rap" to "tamil rap songs",
+        "Tamil Indie" to "tamil indie songs",
+        "Tamil Party" to "tamil dance songs",
+        // ── The rest of the world (a tail, not the headline) ─────────────
+        "Bollywood Hits" to "bollywood hits",
+        "Hindi Love" to "hindi love songs",
+        "Telugu Hits" to "telugu hits",
+        "Malayalam Hits" to "malayalam hits",
+        "English Pop" to "english pop hits",
+        "K-Pop" to "kpop hits",
+        "Global Top 40" to "top 40 hits 2024",
+        "Lo-Fi & Chill" to "lofi chill beats",
     )
 
     class CatalogException(message: String) : Exception(message)
@@ -75,19 +118,38 @@ object CatalogService {
 
     @Throws(CatalogException::class)
     private fun fetchAndBuild(): Catalog {
-        val mixes = SEEDS.mapNotNull { (title, query) ->
-            val tracks = runCatching { fetchResults(query) }.getOrNull().orEmpty()
-            if (tracks.isEmpty()) null else Mix(title, tracks.size, tracks.take(12))
+        val fetched = fetchAllSeeds()
+        val mixes = fetched.mapNotNull { (title, tracks) ->
+            if (tracks.isEmpty()) null else Mix(title, tracks.size, tracks.take(TRACKS_PER_MIX))
         }
         val merged = mixes.flatMap { it.tracks }.distinctBy { it.id }
-        if (merged.size < 24 || mixes.size < 3) {
+        if (merged.size < MIN_TRACKS || mixes.size < MIN_MIXES) {
             throw CatalogException(
                 "The service answered, but with too little usable data " +
                     "(${merged.size} tracks from ${mixes.size}/${SEEDS.size} mixes)."
             )
         }
-        val catalog = Catalog(merged, mixes, System.currentTimeMillis())
-        return catalog
+        return Catalog(merged, mixes, System.currentTimeMillis())
+    }
+
+    /** Fire every seed at once on a bounded pool; failures are simply skipped. */
+    private fun fetchAllSeeds(): List<Pair<String, List<Track>>> {
+        val executor = Executors.newFixedThreadPool(PARALLELISM) { runnable ->
+            Thread(runnable, "aud-catalog").apply { isDaemon = true }
+        }
+        return try {
+            val tasks: List<Callable<Pair<String, List<Track>>>> = SEEDS.map { (title, query) ->
+                Callable {
+                    val tracks: List<Track> = runCatching { fetchResults(query) }.getOrDefault(emptyList())
+                    title to tracks
+                }
+            }
+            executor.invokeAll(tasks, 75, TimeUnit.SECONDS).map { future ->
+                runCatching { future.get() }.getOrElse { Pair("", emptyList<Track>()) }
+            }.filter { it.first.isNotEmpty() }
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     private fun fetchResults(query: String): List<Track> {
@@ -100,13 +162,13 @@ object CatalogService {
     private fun httpGet(urlString: String): String {
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = 12_000
-            readTimeout = 20_000
+            connectTimeout = 10_000
+            readTimeout = 18_000
             instanceFollowRedirects = true
             useCaches = false
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Encoding", "identity")
-            setRequestProperty("User-Agent", "AUD-Android/1.0 (+https://aud29.thangamprabhu1.workers.dev)")
+            setRequestProperty("User-Agent", "AUD-Android/1.1 (+https://aud29.thangamprabhu1.workers.dev)")
         }
         try {
             val code = connection.responseCode
@@ -133,20 +195,32 @@ object CatalogService {
             val audioUrl = bestAudio(raw) ?: continue
             val title = clean(raw.optString("name").ifBlank { raw.optString("title") })
             if (title.isEmpty()) continue
+            val artist = clean(raw.optString("primaryArtists").ifBlank { "Unknown Artist" })
+            val album = clean(raw.optString("album").ifBlank { "Singles" })
             tracks += Track(
                 id = "ls_${raw.optString("id")}",
                 title = title,
-                artistName = clean(raw.optString("primaryArtists").ifBlank { "Unknown Artist" }),
-                albumName = clean(raw.optString("album").ifBlank { "Singles" }),
+                artistName = artist,
+                albumName = album,
                 imageUrl = imageUrl(raw),
                 audioUrl = audioUrl,
                 durationSec = raw.optInt("duration", 0).coerceAtLeast(0),
                 releaseYear = raw.optString("year").toIntOrNull() ?: 0,
-                language = clean(raw.optString("language")).replaceFirstChar { it.titlecase() },
+                language = resolveLanguage(raw.optString("language"), title, artist, album),
                 sourceUrl = raw.optString("url").ifBlank { null },
             )
         }
         return tracks
+    }
+
+    /**
+     * Canonical language for a track. When the feed omits it, fall back to a
+     * Tamil-credit heuristic so Tamil rows still land in the Tamil rails.
+     */
+    private fun resolveLanguage(raw: String, title: String, artist: String, album: String): String {
+        val canonical = Languages.canonical(raw)
+        if (canonical.isNotEmpty() && canonical != "Music") return canonical
+        return if (Languages.inferTamil(title, artist, album)) "Tamil" else "Music"
     }
 
     /** Prefer 320 → 160 → 96 → 48 kbps. Worker reports quality as e.g. "320kbps". */
@@ -248,11 +322,11 @@ object CatalogService {
                     audioUrl = o.getString("audio"),
                     durationSec = o.optInt("dur", 0),
                     releaseYear = o.optInt("year", 0),
-                    language = o.optString("lang"),
+                    language = Languages.canonical(o.optString("lang")),
                     sourceUrl = o.optString("link").ifBlank { null },
                 )
             }
-            if (tracks.size < 24) return null
+            if (tracks.size < MIN_TRACKS) return null
             val byId = tracks.associateBy { it.id }
 
             val mixes = ArrayList<Mix>()

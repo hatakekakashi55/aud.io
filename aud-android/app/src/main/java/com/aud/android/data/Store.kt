@@ -4,12 +4,20 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * Tiny persistent store — liked track ids and recently played ids,
- * in SharedPreferences. No database needed at this scale.
+ * Tiny persistent store — liked track ids, recently played ids and the play
+ * telemetry that tunes "For You", all in SharedPreferences.
+ *
+ * **Resetting the feed**: [resetTaste] throws away every personalization signal
+ * (play counts, artist affinity, language affinity) and bumps a reset counter so
+ * the next feed is a fresh Tamil-first spread rather than a replay of the old
+ * one. Likes and recents are deliberately kept — they are the user's library,
+ * not a ranking signal.
  */
 class Store(context: Context) {
 
     private val prefs = context.applicationContext.getSharedPreferences("aud_prefs", Context.MODE_PRIVATE)
+
+    /* ── Library ─────────────────────────────────────────────────── */
 
     fun likedIds(): Set<String> = prefs.getStringSet(KEY_LIKED, emptySet())?.toSet() ?: emptySet()
 
@@ -37,12 +45,44 @@ class Store(context: Context) {
     fun recordPlay(track: Track) {
         bump(KEY_PLAY_COUNTS, track.id)
         bump(KEY_ARTIST_COUNTS, artistKey(track))
-        if (track.language.isNotBlank()) bump(KEY_LANGUAGE_COUNTS, track.language.lowercase())
+        val language = Languages.canonical(track.language)
+        if (language.isNotBlank()) bump(KEY_LANGUAGE_COUNTS, language.lowercase())
+    }
+
+    /** Records a manual skip (user hit next early) — a negative taste signal. */
+    fun recordSkip(track: Track) {
+        bump(KEY_SKIP_COUNTS, track.id)
+        bump(KEY_SKIP_ARTISTS, artistKey(track))
     }
 
     fun playCounts(): Map<String, Int> = readMap(KEY_PLAY_COUNTS)
+    fun skipCounts(): Map<String, Int> = readMap(KEY_SKIP_COUNTS)
+    fun skippedArtists(): Map<String, Int> = readMap(KEY_SKIP_ARTISTS)
     fun artistAffinity(): Map<String, Int> = readMap(KEY_ARTIST_COUNTS)
     fun languageAffinity(): Map<String, Int> = readMap(KEY_LANGUAGE_COUNTS)
+
+    /** Total spins recorded — the "has this listener started yet?" test. */
+    fun totalPlays(): Int = playCounts().values.sum()
+
+    /** How many times the feed has been reset; rotates the fresh Tamil shelf. */
+    fun feedResetCount(): Int = prefs.getInt(KEY_RESET_COUNT, 0)
+
+    /**
+     * Wipes every signal that tunes the feed and returns the new reset count.
+     * Likes + recents are untouched.
+     */
+    fun resetTaste(): Int {
+        val next = feedResetCount() + 1
+        prefs.edit()
+            .remove(KEY_PLAY_COUNTS)
+            .remove(KEY_ARTIST_COUNTS)
+            .remove(KEY_LANGUAGE_COUNTS)
+            .remove(KEY_SKIP_COUNTS)
+            .remove(KEY_SKIP_ARTISTS)
+            .putInt(KEY_RESET_COUNT, next)
+            .apply()
+        return next
+    }
 
     fun artistKey(track: Track): String =
         track.artistName.lowercase().split(",").firstOrNull()?.trim()?.take(48).orEmpty()
@@ -73,5 +113,8 @@ class Store(context: Context) {
         private const val KEY_PLAY_COUNTS = "play_counts_v1"
         private const val KEY_ARTIST_COUNTS = "artist_counts_v1"
         private const val KEY_LANGUAGE_COUNTS = "language_counts_v1"
+        private const val KEY_SKIP_COUNTS = "skip_counts_v1"
+        private const val KEY_SKIP_ARTISTS = "skip_artists_v1"
+        private const val KEY_RESET_COUNT = "feed_reset_count"
     }
 }

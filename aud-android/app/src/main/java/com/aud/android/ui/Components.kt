@@ -56,7 +56,7 @@ fun formatTime(totalSeconds: Int): String {
 /* ── VU bars — the "on air" indicator on the current row ── */
 
 @Composable
-fun VuBars(active: Boolean, modifier: Modifier = Modifier, color: Color = Ink.Brass) {
+fun VuBars(active: Boolean, modifier: Modifier = Modifier, color: Color = Ink.Primary) {
     val transition = rememberInfiniteTransition(label = "vu")
     val spec = infiniteRepeatable<Float>(tween(540), RepeatMode.Reverse)
     val b1 by transition.animateFloat(0.25f, 1f, spec, label = "v1")
@@ -83,11 +83,11 @@ fun VuBars(active: Boolean, modifier: Modifier = Modifier, color: Color = Ink.Br
 /* ── Artwork — Coil with hairline border and warm gradient + serif fallback ── */
 
 private val FALLBACK_PALETTES = listOf(
-    listOf(Color(0xFF4A2C17), Ink.Brass),
-    listOf(Color(0xFF33261F), Color(0xFFB4653A)),
-    listOf(Color(0xFF262B2B), Color(0xFF5F7A72)),
-    listOf(Color(0xFF2E2433), Color(0xFF8A6A9B)),
-    listOf(Color(0xFF33301E), Color(0xFFA8A35C)),
+    listOf(Color(0xFF1D3026), Ink.Primary),
+    listOf(Color(0xFF2A3529), Color(0xFF8FBF9B)),
+    listOf(Color(0xFF243029), Color(0xFF7FB7A1)),
+    listOf(Color(0xFF2F2F24), Color(0xFFB9C08A)),
+    listOf(Color(0xFF31291F), Color(0xFFC9A87C)),
 )
 
 @Composable
@@ -110,7 +110,7 @@ fun Artwork(
         ) {
             Text(
                 seed.firstOrNull()?.uppercaseChar()?.toString() ?: "A",
-                color = Ink.Parchment.copy(alpha = 0.9f),
+                color = Ink.Text.copy(alpha = 0.9f),
                 fontFamily = Serif,
                 fontWeight = FontWeight.Black,
                 fontSize = 34.sp,
@@ -147,15 +147,15 @@ fun SectionHeader(kicker: String, title: String, modifier: Modifier = Modifier) 
     Column(modifier.padding(horizontal = 20.dp, vertical = 2.dp)) {
         Text(
             kicker.uppercase(),
-            color = Ink.Brass,
+            color = Ink.Accent,
             fontFamily = Mono,
-            fontSize = 9.5.sp,
+            fontSize = 10.sp,
             letterSpacing = 2.2.sp,
         )
         Spacer(Modifier.height(5.dp))
         Text(
             title,
-            color = Ink.Parchment,
+            color = Ink.Text,
             fontFamily = Serif,
             fontWeight = FontWeight.Bold,
             fontSize = 21.sp,
@@ -183,7 +183,7 @@ fun LinerRow(
     ) {
         Text(
             "%02d".format(index + 1),
-            color = if (isCurrent) Ink.Brass else Ink.Faint,
+            color = if (isCurrent) Ink.Primary else Ink.Faint,
             fontFamily = Mono,
             fontSize = 11.sp,
             modifier = Modifier.width(26.dp),
@@ -193,7 +193,7 @@ fun LinerRow(
         Column(Modifier.weight(1f)) {
             Text(
                 track.title,
-                color = if (isCurrent) Ink.Brass else Ink.Parchment,
+                color = if (isCurrent) Ink.Primary else Ink.Text,
                 fontFamily = Serif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
@@ -202,7 +202,7 @@ fun LinerRow(
             )
             Spacer(Modifier.height(3.dp))
             Text(
-                track.shortArtists.uppercase(),
+                track.creditLine,
                 color = Ink.Muted,
                 fontFamily = Mono,
                 fontSize = 9.sp,
@@ -229,12 +229,12 @@ fun LinerRow(
 /* ── Mix "tape" card — horizontal rail item ── */
 
 private val TAPE_GRADIENTS = listOf(
-    Brush.verticalGradient(listOf(Color(0xFF4A2C17), Color(0xFF20150B))),
-    Brush.verticalGradient(listOf(Color(0xFF2E2433), Color(0xFF1A1322))),
-    Brush.verticalGradient(listOf(Color(0xFF24331F), Color(0xFF151F0E))),
-    Brush.verticalGradient(listOf(Color(0xFF33261F), Color(0xFF211712))),
-    Brush.verticalGradient(listOf(Color(0xFF1F2E33), Color(0xFF131E24))),
-    Brush.verticalGradient(listOf(Color(0xFF33331B), Color(0xFF222211))),
+    Brush.verticalGradient(listOf(Color(0xFF24402F), Color(0xFF121B16))),
+    Brush.verticalGradient(listOf(Color(0xFF203A34), Color(0xFF101A18))),
+    Brush.verticalGradient(listOf(Color(0xFF2E3A26), Color(0xFF151A12))),
+    Brush.verticalGradient(listOf(Color(0xFF3A3226), Color(0xFF1A1712))),
+    Brush.verticalGradient(listOf(Color(0xFF1F3330), Color(0xFF111A19))),
+    Brush.verticalGradient(listOf(Color(0xFF32352A), Color(0xFF191A14))),
 )
 
 @Composable
@@ -258,7 +258,7 @@ fun TapeCard(
         Column(Modifier.fillMaxWidth()) {
             Text(
                 "TAPE %02d".format(index + 1),
-                color = Ink.Brass,
+                color = Ink.Primary,
                 fontFamily = Mono,
                 fontSize = 8.5.sp,
                 letterSpacing = 2.sp,
@@ -266,7 +266,7 @@ fun TapeCard(
             Spacer(Modifier.height(30.dp))
             Text(
                 title,
-                color = Ink.Parchment,
+                color = Ink.Text,
                 fontFamily = Serif,
                 fontWeight = FontWeight.Bold,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -288,14 +288,14 @@ fun TapeCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = CircleShape,
-                    color = Ink.Brass,
+                    color = Ink.Primary,
                     modifier = Modifier.size(26.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Rounded.PlayArrow,
                             contentDescription = "Play $title",
-                            tint = Ink.OnBrass,
+                            tint = Ink.OnPrimary,
                             modifier = Modifier.size(16.dp),
                         )
                     }

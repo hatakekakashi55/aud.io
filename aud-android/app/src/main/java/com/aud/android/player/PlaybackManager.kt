@@ -62,7 +62,10 @@ class PlaybackManager(private val store: Store) {
         }
     }
 
-    fun next() = advance(auto = false)
+    fun next() {
+        noteManualSkip()
+        advance(auto = false)
+    }
 
     fun previous() {
         val s = _state.value
@@ -70,6 +73,7 @@ class PlaybackManager(private val store: Store) {
             seekTo(0)
             return
         }
+        noteManualSkip()
         if (s.queue.isEmpty()) return
         val target = if (s.index <= 0) s.queue.lastIndex else s.index - 1
         _state.update { it.copy(index = target, positionSec = 0) }
@@ -92,6 +96,20 @@ class PlaybackManager(private val store: Store) {
     }
 
     /* ── internals ─────────────────────────────────────────────── */
+
+    /**
+     * A manual "next" in the first 40% of a track (and under 90 s) means the
+     * listener rejected it — that feeds the For You demotion. Auto-advance on
+     * completion, or skipping a dead stream, is not a skip.
+     */
+    private fun noteManualSkip() {
+        val state = _state.value
+        val track = state.current ?: return
+        val duration = state.durationSec.coerceAtLeast(track.durationSec)
+        if (duration <= 0) return
+        val earlyEnough = state.positionSec < 90 && state.positionSec < (duration * 0.4f).toInt()
+        if (earlyEnough) store.recordSkip(track)
+    }
 
     private fun advance(auto: Boolean) {
         val s = _state.value

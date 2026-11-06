@@ -13,41 +13,69 @@ fallback to lower rates.
 
 ## What it plays
 
-A **worldwide shelf**, not a regional one — seeded from global genres
-(Global Top 40, Pop, Hip-Hop, Electronic, R&B, Latin, K-Pop) plus a local shelf
-(Rahman, Ilaiyaraaja, Tamil love, latest), so the feed opens up the whole map.
+A **Tamil-first shelf** — Tamil cinema across eras and composers (Anirudh, A. R. Rahman,
+Ilaiyaraaja, Yuvan, Harris Jayaraj, Santhosh Narayanan, G. V. Prakash, Vijay/Ajith/Dhanush
+film hits, Tamil love, kuthu, melody, 90s gold, rap, indie, party, fresh releases), with a
+short **world tail** (Bollywood, Telugu, Malayalam, English pop, K-Pop, global charts, lo-fi)
+so the home page still feels like a world of music rather than one region.
+
+**28 live seed queries** now hydrate the catalog instead of the old 12, each one doubling as
+an editorial "tape". They run in parallel on a small pool, so the bigger shelf costs about
+the same boot time; each seed contributes up to 20 tracks and the union is fully deduped.
+The home page is built from that union — For You rail, "Trending in Tamil", "Your last spins",
+"Artists you'll love" (grouped from the live catalog), the tape rail, and a blended chart
+(Tamil leads, the world follows at roughly 1 in 4).
 
 ## Personalized feed — "For You"
 
 Not another copy of the charts. Every spin is counted on-device:
 
-- play counts per track, artist affinity, language affinity, likes;
-- the **For You** rail (home) re-ranks the catalog on every track change — heavy on
-  the artists and languages you actually play, with a discovery boost for unplayed
-  tracks, demotion of overplayed ones, and per-artist diversity guardrails;
+- play counts per track, artist affinity, language affinity, likes — and **skips**: a manual
+  `next` inside the first 40 % (and under 90 s) of a track demotes that track and softens
+  that artist;
+- the **For You** rail re-ranks the catalog on every track change, heavy on the artists and
+  languages you actually play, with a discovery boost for unplayed tracks, demotion of
+  overplayed ones, per-artist diversity guardrails, and a **Tamil quota** (≥ 2 of every 3
+  picks) so the rail stays home-language-first no matter what you play;
 - the hero card (**Play for You**) starts that personalized queue in one tap;
-- a brand-new listener gets a deterministic round-robin spread across all mixes —
-  the whole world, no region bias.
+- a brand-new listener — or anyone who just reset the feed — gets the **Tamil shelf**:
+  Tamil mixes interleaved round-robin, then a short world tail. Resets rotate the shelf so
+  it is never a carbon copy.
+
+### Resetting the feed
+
+Two taps, no dialog: the **RESET FEED** control sits under the For You rail on **NOW** and in
+the **Feed tuning** card on **SHELF**. The first tap arms it ("tap again to reset"), the second
+wipes play counts, artist/language affinity and skips — then the home feed immediately comes
+back as the **Tamil shelf**. Likes and recents are deliberately kept: they are your library,
+not a ranking signal.
 
 Everything is computed locally in `data/Personalize.kt` — zero extra network calls.
 
-## Identity — a relaxed listening room, typeset
+## Identity — a calm room, easier on the eyes
 
-Built for long sessions and tired eyes: warm soft-charcoal background (never pure
-black), desaturated brass accent, parchment text (never chalk white), low-contrast
-hairlines, roomier row heights and touch targets, larger nav icons. The visual
-language is a print music paper's listening page — serif display headlines, monospace
-metadata, numbered liner-notes index, "tapes" instead of playlists, a Canvas-drawn
-tape-waveform seek bar, and a mini player with a 2dp brass progress hairline and
-full transport detail (NOW SPINNING kicker, title, artist · year, like, next, play).
+Re-tuned for long sessions and tired eyes — and for legibility first:
+
+- deep **moss charcoal** background (never pure black), warmer card surfaces, barely-there
+  hairlines;
+- **soft sage-mint primary** (replacing the old brass/amber) for state, actions and the play
+  button, with a single warm-sand secondary used only for section kickers;
+- parchment-sage text instead of chalk white — every text tone clears **WCAG AA (4.5:1)** on
+  the darkest surface, and the muted tones clear it on raised cards too;
+- larger type in rails and rows, language tags on every credit line (`ANIRUDH · TAMIL`),
+  roomier touch targets, softer corner radii.
+
+The visual language is still a print music paper's listening page — serif headlines,
+monospace metadata, numbered liner-notes index, "tapes" instead of playlists, a Canvas-drawn
+tape-waveform seek bar, and a mini player with a primary-colour progress hairline.
 
 Bottom nav: **NOW · FIND · SHELF**.
 
-- **NOW** — masthead greeting (time-aware), Play-for-You hero, For You rail,
-  worldwide tape rail, Trending.
-- **FIND** — instant local matches + a live "From the Wire" section (debounced,
-  always fresh).
-- **SHELF** — your likes + recently spun, stored on this device.
+- **NOW** — masthead greeting (time-aware), Play-for-You hero, For You rail + reset,
+  last spins, Trending in Tamil, Artists you'll love, worldwide tape rail, blended chart.
+- **FIND** — instant local matches + a live "From the Wire" section (debounced, always
+  fresh), with Tamil-first shortcuts.
+- **SHELF** — feed tuning (reset) + your likes + recently spun, stored on this device.
 
 ## Live connection (how it works)
 
@@ -60,13 +88,14 @@ GET {BASE}/api/search/songs?query=<q>
 ```
 
 - `BASE` lives in `data/CatalogService.kt` (`const val BASE`) — change it in one place.
-- Catalog = seed queries fired on `Dispatchers.IO`, deduped by track id;
-  <24 merged tracks or it's an honest error, never filler.
+- Catalog = 28 Tamil-first seed queries fired in parallel off the main thread, deduped by
+  track id; <40 merged tracks from <3 mixes and it's an honest error, never filler.
 - **Cache**: merged catalog is written to SharedPreferences as JSON (15-minute TTL).
   Fresh cache short-circuits the network; a *stale* cache is the offline fallback.
 - Queries are re-encoded with `URLEncoder`; HTML entities in names are unescaped;
   320 kbps preferred with 160 → 96 → 48 fallback.
-- Likes, recents and play telemetry persist via `data/Store.kt` (SharedPreferences).
+- Likes, recents, play/skip telemetry and the feed-reset counter persist via
+  `data/Store.kt` (SharedPreferences).
 - Playback: `MediaPlayer` engine (`player/PlaybackManager.kt`) exposing `StateFlow`
   (queue / position / shuffle / repeat-one), with bounded auto-skip of dead streams.
 
@@ -100,15 +129,16 @@ Release: `gradle assembleRelease` — sign with your own keystore (none is bundl
 aud-android/
   app/src/main/java/com/aud/android/
     MainActivity.kt            # store + player singletons, theme entry
-    data/Models.kt             # Track / Mix / Catalog (@Immutable)
+    data/Models.kt             # Track / Mix / Catalog / artist shelf (@Immutable)
+    data/Languages.kt          # language normalisation + Tamil inference
     data/CatalogService.kt     # all network + cache + parsing — the only door
     data/Personalize.kt        # the For You ranking engine (no network)
-    data/Store.kt              # likes, recents, play telemetry (SharedPreferences)
+    data/Store.kt              # likes, recents, play/skip telemetry, feed reset
     player/PlaybackManager.kt  # MediaPlayer + StateFlow, bounded auto-skip
-    ui/Theme.kt                # relaxed Ink palette + dark scheme
+    ui/Theme.kt                # calm moss + sage-mint palette (WCAG AA) + shapes
     ui/WaveformBar.kt          # the tape-waveform seek bar (tap/drag, Canvas)
     ui/Components.kt           # Artwork, LinerRow, TapeCard, …
-    ui/NowScreen.kt            # front page: greeting, hero, For You rail, chart
+    ui/NowScreen.kt            # front page: hero, For You (Tamil), rails, chart
     ui/SearchScreen.kt         # local matches + live "From the Wire"
     ui/CollectionScreen.kt     # your shelf — likes + recently spun
     ui/FullPlayer.kt           # the "listening card" (slides up)

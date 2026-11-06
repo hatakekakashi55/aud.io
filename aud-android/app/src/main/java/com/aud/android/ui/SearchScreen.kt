@@ -47,7 +47,7 @@ private sealed interface WireState {
     data object Error : WireState
 }
 
-private val QUICK = listOf("Anirudh", "A. R. Rahman", "Ilaiyaraaja", "Kuthu", "Sad", "Bollywood", "Love")
+private val QUICK = listOf("Anirudh", "A. R. Rahman", "Ilaiyaraaja", "Yuvan", "Kuthu", "Tamil Love", "Melody", "Dhanush")
 
 /** The archive — instant local matches, plus a live "From the Wire" search. */
 @Composable
@@ -121,11 +121,11 @@ fun SearchScreen(
                         onValueChange = { query = it },
                         singleLine = true,
                         textStyle = androidx.compose.ui.text.TextStyle(
-                            color = Ink.Parchment,
+                            color = Ink.Text,
                             fontFamily = Serif,
                             fontSize = 20.sp,
                         ),
-                        cursorBrush = SolidColor(Ink.Brass),
+                        cursorBrush = SolidColor(Ink.Primary),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -134,7 +134,7 @@ fun SearchScreen(
                     Modifier
                         .fillMaxWidth()
                         .height(1.5.dp)
-                        .background(Ink.Brass)
+                        .background(Ink.Primary)
                 )
             }
         }
@@ -240,7 +240,7 @@ private fun FlowChips(values: List<String>, onPick: (String) -> Unit) {
                 row.forEach { value ->
                     Text(
                         value.uppercase(),
-                        color = Ink.Parchment,
+                        color = Ink.Text,
                         fontFamily = Mono,
                         fontSize = 9.5.sp,
                         letterSpacing = 1.3.sp,

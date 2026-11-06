@@ -21,9 +21,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aud.android.data.Catalog
 import com.aud.android.data.Track
+import kotlinx.coroutines.delay
 
 /** Your shelf — liked tracks and the last spins, kept on this device. */
 @Composable
@@ -43,6 +50,7 @@ fun CollectionScreen(
     currentTrackId: String?,
     isPlaying: Boolean,
     onPlay: (List<Track>, Int) -> Unit,
+    onResetFeed: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
     val byId = catalog.tracks.associateBy { it.id }
@@ -59,6 +67,12 @@ fun CollectionScreen(
             Spacer(Modifier.height(4.dp))
         }
 
+        /* ── Feed controls — reset lives here too, always reachable ── */
+        item(key = "feed-controls") {
+            FeedTuningCard(onResetFeed = onResetFeed)
+            Spacer(Modifier.height(10.dp))
+        }
+
         if (liked.isEmpty() && recents.isEmpty()) {
             item(key = "empty") { EmptyShelf() }
             return@LazyColumn
@@ -69,7 +83,7 @@ fun CollectionScreen(
             item(key = "recent-kicker") {
                 Text(
                     "RECENTLY SPUN",
-                    color = Ink.Brass,
+                    color = Ink.Primary,
                     fontFamily = Mono,
                     fontSize = 9.sp,
                     letterSpacing = 2.sp,
@@ -93,7 +107,7 @@ fun CollectionScreen(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 track.title,
-                                color = Ink.Parchment,
+                                color = Ink.Text,
                                 fontFamily = Serif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 11.sp,
@@ -117,7 +131,7 @@ fun CollectionScreen(
             ) {
                 Text(
                     "SAVED",
-                    color = Ink.Brass,
+                    color = Ink.Primary,
                     fontFamily = Mono,
                     fontSize = 9.sp,
                     letterSpacing = 2.sp,
@@ -157,6 +171,82 @@ fun CollectionScreen(
     }
 }
 
+/**
+ * "Feed tuning" card — explains what personalizes the home rail and offers a
+ * two-step reset. Resetting never touches likes or recents, so this is the
+ * safe place to start over from.
+ */
+@Composable
+private fun FeedTuningCard(onResetFeed: () -> Unit) {
+    var armed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(armed) {
+        if (armed) {
+            delay(4_000)
+            armed = false
+        }
+    }
+    Column(
+        Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Ink.Raised)
+            .border(1.dp, Ink.Line, RoundedCornerShape(18.dp))
+            .padding(16.dp),
+    ) {
+        Text(
+            "FEED TUNING",
+            color = Ink.Accent,
+            fontFamily = Mono,
+            fontSize = 9.sp,
+            letterSpacing = 2.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "For You learns from every spin — artists, language, repeats. Reset it and the home feed starts again from the Tamil shelf. Your likes and recents stay put.",
+            color = Ink.Muted,
+            fontFamily = Sans,
+            fontSize = 12.5.sp,
+            lineHeight = 18.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .border(
+                    1.dp,
+                    if (armed) Ink.Signal else Ink.Primary.copy(alpha = 0.45f),
+                    RoundedCornerShape(50),
+                )
+                .clickable {
+                    if (armed) {
+                        armed = false
+                        onResetFeed()
+                    } else {
+                        armed = true
+                    }
+                }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Rounded.Refresh,
+                contentDescription = null,
+                tint = if (armed) Ink.Signal else Ink.Primary,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (armed) "TAP AGAIN TO RESET" else "RESET FEED",
+                color = if (armed) Ink.Signal else Ink.Primary,
+                fontFamily = Mono,
+                fontSize = 9.sp,
+                letterSpacing = 1.4.sp,
+            )
+        }
+    }
+}
+
 @Composable
 private fun EmptyShelf() {
     Column(
@@ -173,14 +263,14 @@ private fun EmptyShelf() {
             Icon(
                 Icons.Rounded.FavoriteBorder,
                 contentDescription = null,
-                tint = Ink.Brass,
+                tint = Ink.Primary,
                 modifier = Modifier.size(36.dp),
             )
         }
         Spacer(Modifier.height(18.dp))
         Text(
             "Nothing shelved yet.",
-            color = Ink.Parchment,
+            color = Ink.Text,
             fontFamily = Serif,
             fontStyle = FontStyle.Italic,
             fontSize = 22.sp,

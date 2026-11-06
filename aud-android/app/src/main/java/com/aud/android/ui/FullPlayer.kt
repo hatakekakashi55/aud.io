@@ -53,7 +53,7 @@ import com.aud.android.player.PlaybackState
 
 /**
  * Full-screen player — the "listening card".
- * Artwork under a brass rule, a deterministic tape-waveform scrubber,
+ * Artwork under a primary rule, a deterministic tape-waveform scrubber,
  * and transport set in mono/serif rather than icons-on-black.
  */
 @Composable
@@ -78,7 +78,7 @@ fun FullPlayerContent(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF241B11), Ink.Background, Ink.Background)
+                    listOf(Color(0xFF1B2C22), Ink.Background, Ink.Background)
                 )
             ),
     ) {
@@ -94,14 +94,14 @@ fun FullPlayerContent(
                         Icon(
                             Icons.Rounded.KeyboardArrowDown,
                             contentDescription = "Close",
-                            tint = Ink.Parchment,
+                            tint = Ink.Text,
                             modifier = Modifier.size(30.dp),
                         )
                     }
                     Spacer(Modifier.weight(1f))
                     Text(
                         "NOW SPINNING",
-                        color = Ink.Brass,
+                        color = Ink.Primary,
                         fontFamily = Mono,
                         fontSize = 9.sp,
                         letterSpacing = 2.6.sp,
@@ -112,15 +112,15 @@ fun FullPlayerContent(
 
                 Spacer(Modifier.height(12.dp))
 
-                /* Artwork under the brass rule */
+                /* Artwork under the primary rule */
                 Hairline(Modifier.padding(bottom = 14.dp))
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .height(320.dp)
-                        .shadow(26.dp, RoundedCornerShape(20.dp), clip = false, spotColor = Ink.Brass.copy(alpha = 0.5f))
+                        .shadow(26.dp, RoundedCornerShape(20.dp), clip = false, spotColor = Ink.Primary.copy(alpha = 0.5f))
                         .clip(RoundedCornerShape(20.dp))
-                        .border(1.dp, Ink.Brass.copy(alpha = 0.45f), RoundedCornerShape(20.dp)),
+                        .border(1.dp, Ink.Primary.copy(alpha = 0.45f), RoundedCornerShape(20.dp)),
                 ) {
                     Artwork(track.imageUrl, track.title, Modifier.fillMaxSize(), corner = 20.dp)
                 }
@@ -135,7 +135,7 @@ fun FullPlayerContent(
                     Spacer(Modifier.weight(1f))
                     Text(
                         "%02d / %02d".format(playback.index + 1, playback.queue.size),
-                        color = Ink.Brass,
+                        color = Ink.Primary,
                         fontFamily = Mono,
                         fontSize = 8.sp,
                         letterSpacing = 2.sp,
@@ -147,7 +147,7 @@ fun FullPlayerContent(
                 /* Title + artist */
                 Text(
                     track.title,
-                    color = Ink.Parchment,
+                    color = Ink.Text,
                     fontFamily = Serif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 23.sp,
@@ -159,6 +159,7 @@ fun FullPlayerContent(
                 Text(
                     buildString {
                         append(track.artistName.uppercase())
+                        append("  ·  " + track.languageTag)
                         if (track.releaseYear > 0) append("  ·  ${track.releaseYear}")
                     },
                     color = Ink.Muted,
@@ -192,7 +193,7 @@ fun FullPlayerContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val shuffleTint by animateColorAsState(
-                        if (playback.shuffle) Ink.Brass else Ink.Faint,
+                        if (playback.shuffle) Ink.Primary else Ink.Faint,
                         animationSpec = tween(200),
                         label = "shuffleTint",
                     )
@@ -203,12 +204,12 @@ fun FullPlayerContent(
                         Icon(
                             Icons.Rounded.SkipPrevious,
                             contentDescription = "Previous",
-                            tint = Ink.Parchment,
+                            tint = Ink.Text,
                             modifier = Modifier.size(34.dp),
                         )
                     }
                     Surface(
-                        color = Ink.Brass,
+                        color = Ink.Primary,
                         shape = CircleShape,
                         modifier = Modifier.size(64.dp).clickable(onClick = onToggle),
                     ) {
@@ -217,7 +218,7 @@ fun FullPlayerContent(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     strokeWidth = 2.4.dp,
-                                    color = Ink.OnBrass,
+                                    color = Ink.OnPrimary,
                                 )
                             } else {
                                 Crossfade(
@@ -228,7 +229,7 @@ fun FullPlayerContent(
                                     Icon(
                                         if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                         contentDescription = if (playing) "Pause" else "Play",
-                                        tint = Ink.OnBrass,
+                                        tint = Ink.OnPrimary,
                                         modifier = Modifier.size(34.dp),
                                     )
                                 }
@@ -239,12 +240,12 @@ fun FullPlayerContent(
                         Icon(
                             Icons.Rounded.SkipNext,
                             contentDescription = "Next",
-                            tint = Ink.Parchment,
+                            tint = Ink.Text,
                             modifier = Modifier.size(34.dp),
                         )
                     }
                     val repeatTint by animateColorAsState(
-                        if (playback.repeatOne) Ink.Brass else Ink.Faint,
+                        if (playback.repeatOne) Ink.Primary else Ink.Faint,
                         animationSpec = tween(200),
                         label = "repeatTint",
                     )
@@ -262,7 +263,7 @@ fun FullPlayerContent(
                 /* Save to shelf */
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     val likeTint by animateColorAsState(
-                        if (liked) Ink.Brass else Ink.Parchment,
+                        if (liked) Ink.Primary else Ink.Text,
                         animationSpec = tween(200),
                         label = "likeTint",
                     )

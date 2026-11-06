@@ -92,12 +92,29 @@ fun AudApp(player: PlaybackManager, store: Store) {
     var fullPlayerOpen by remember { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(NOW) }
 
+    // Bumped whenever the listener resets the feed, so the ranking recomputes
+    // even though the catalog and the current track stayed the same.
+    var feedEpoch by remember { mutableIntStateOf(0) }
+    var resetNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(resetNotice) {
+        if (resetNotice != null) {
+            kotlinx.coroutines.delay(3_200)
+            resetNotice = null
+        }
+    }
+
     // Recents are keyed off the current track so the shelf refreshes on every play.
     val currentId = playback.current?.id
     val recentIds = remember(currentId) { store.recentIds() }
 
     val onPlay: (List<Track>, Int) -> Unit = remember(player) {
         { queue, index -> player.playQueue(queue, index) }
+    }
+    // Wipes play/artist/language signals and the feed falls back to Tamil.
+    val onResetFeed: () -> Unit = {
+        store.resetTaste()
+        feedEpoch += 1
+        resetNotice = "Feed reset — the Tamil shelf is back"
     }
     val onToggleLike: (String) -> Unit = remember(store) {
         { trackId -> likedIds = if (store.toggleLike(trackId)) likedIds + trackId else likedIds - trackId }
@@ -109,8 +126,12 @@ fun AudApp(player: PlaybackManager, store: Store) {
             is CatalogState.Error -> ErrorScreen(message = state.message, onRetry = { reloadKey++ })
             is CatalogState.Ready -> {
                 val catalog = state.catalog
-                val forYou = remember(catalog, currentId) {
+                val forYou = remember(catalog, currentId, feedEpoch) {
                     Personalize.forYou(catalog, store, limit = 18)
+                }
+                val freshShelf = remember(feedEpoch, currentId) { Personalize.isFreshShelf(store) }
+                val recentTracks = remember(recentIds, catalog) {
+                    recentIds.mapNotNull { id -> catalog.tracks.firstOrNull { it.id == id } }.take(10)
                 }
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f)) {
@@ -118,9 +139,12 @@ fun AudApp(player: PlaybackManager, store: Store) {
                             NOW -> NowScreen(
                                 catalog = catalog,
                                 forYou = forYou,
+                                freshShelf = freshShelf,
+                                recentTracks = recentTracks,
                                 currentTrackId = currentId,
                                 isPlaying = playback.isPlaying,
                                 onPlay = onPlay,
+                                onResetFeed = onResetFeed,
                                 bottomPadding = 0.dp,
                             )
                             FIND -> SearchScreen(
@@ -137,10 +161,18 @@ fun AudApp(player: PlaybackManager, store: Store) {
                                 currentTrackId = currentId,
                                 isPlaying = playback.isPlaying,
                                 onPlay = onPlay,
+                                onResetFeed = onResetFeed,
                                 bottomPadding = 0.dp,
                             )
                             else -> Unit
                         }
+                    }
+                    AnimatedVisibility(
+                        visible = resetNotice != null,
+                        enter = fadeIn(tween(180)) + slideInVertically(tween(240)) { it / 2 },
+                        exit = fadeOut(tween(220)),
+                    ) {
+                        resetNotice?.let { notice -> ResetToast(notice) }
                     }
                     if (playback.hasTrack) {
                         MiniPlayer(
@@ -189,7 +221,7 @@ private const val NOW = "now"
 private const val FIND = "find"
 private const val SHELF = "shelf"
 
-/* ── Mini player — 2dp brass progress hairline on top ── */
+/* ── Mini player — 2dp primary progress hairline on top ── */
 
 @Composable
 private fun MiniPlayer(
@@ -214,9 +246,9 @@ private fun MiniPlayer(
     ) {
         Box {
             Column {
-                // Brass tape-counter line
+                // Primary tape-counter line
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Ink.Line)) {
-                    Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Ink.Brass))
+                    Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Ink.Primary))
                 }
                 Row(
                     Modifier
@@ -229,7 +261,7 @@ private fun MiniPlayer(
                     Column(Modifier.weight(1f)) {
                         Text(
                             "NOW SPINNING",
-                            color = Ink.Brass,
+                            color = Ink.Primary,
                             fontFamily = Mono,
                             fontSize = 6.5.sp,
                             letterSpacing = 1.6.sp,
@@ -237,7 +269,7 @@ private fun MiniPlayer(
                         Spacer(Modifier.height(3.dp))
                         Text(
                             track.title,
-                            color = Ink.Parchment,
+                            color = Ink.Text,
                             fontFamily = Serif,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.5.sp,
@@ -245,7 +277,7 @@ private fun MiniPlayer(
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                         Text(
-                            "${track.shortArtists.uppercase()}  ·  ${if (track.releaseYear > 0) track.releaseYear else track.language.uppercase()}",
+                            track.creditLine + if (track.releaseYear > 0) "  ·  ${track.releaseYear}" else "",
                             color = Ink.Muted,
                             fontFamily = Mono,
                             fontSize = 7.5.sp,
@@ -257,7 +289,7 @@ private fun MiniPlayer(
                     Icon(
                         if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         contentDescription = "Like",
-                        tint = if (liked) Ink.Brass else Ink.Muted,
+                        tint = if (liked) Ink.Primary else Ink.Muted,
                         modifier = Modifier
                             .size(34.dp)
                             .clickable(onClick = onToggleLike)
@@ -276,19 +308,19 @@ private fun MiniPlayer(
                         CircularProgressIndicator(
                             modifier = Modifier.size(28.dp).padding(5.dp),
                             strokeWidth = 2.dp,
-                            color = Ink.Brass,
+                            color = Ink.Primary,
                         )
                     } else {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = Ink.Brass,
+                            color = Ink.Primary,
                             modifier = Modifier.size(38.dp).clickable(onClick = onToggle),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                                    tint = Ink.OnBrass,
+                                    tint = Ink.OnPrimary,
                                     modifier = Modifier.size(22.dp),
                                 )
                             }
@@ -300,7 +332,7 @@ private fun MiniPlayer(
     }
 }
 
-/* ── Bottom bar — NOW · FIND · SHELF with brass tick ── */
+/* ── Bottom bar — NOW · FIND · SHELF with primary tick ── */
 
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
@@ -332,7 +364,7 @@ private fun BottomItem(
     onSelect: (String) -> Unit,
 ) {
     val isActive = tab == active
-    val tint by animateColorAsState(if (isActive) Ink.Brass else Ink.Muted, animationSpec = tween(200), label = "tabTint")
+    val tint by animateColorAsState(if (isActive) Ink.Primary else Ink.Muted, animationSpec = tween(200), label = "tabTint")
     val barAlpha by animateFloatAsState(if (isActive) 1f else 0f, animationSpec = tween(220), label = "tabBar")
     Column(
         Modifier
@@ -349,7 +381,33 @@ private fun BottomItem(
                 .width(18.dp)
                 .height(2.dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(Ink.Brass.copy(alpha = barAlpha))
+                .background(Ink.Primary.copy(alpha = barAlpha))
+        )
+    }
+}
+
+/* ── Reset confirmation — a quiet, self-dismissing line ── */
+
+@Composable
+private fun ResetToast(message: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Ink.Primary.copy(alpha = 0.12f))
+            .border(1.dp, Ink.Primary.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(Ink.Primary))
+        Spacer(Modifier.width(9.dp))
+        Text(
+            message.uppercase(),
+            color = Ink.Primary,
+            fontFamily = Mono,
+            fontSize = 8.5.sp,
+            letterSpacing = 1.2.sp,
         )
     }
 }
@@ -362,7 +420,7 @@ private fun LoadingScreen() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 "AUD",
-                color = Ink.Parchment,
+                color = Ink.Text,
                 fontFamily = Serif,
                 fontWeight = FontWeight.Black,
                 fontSize = 54.sp,
@@ -371,7 +429,7 @@ private fun LoadingScreen() {
             Spacer(Modifier.height(4.dp))
             Text(
                 "THE LISTENING POST",
-                color = Ink.Brass,
+                color = Ink.Primary,
                 fontFamily = Mono,
                 fontSize = 8.sp,
                 letterSpacing = 3.4.sp,
@@ -413,7 +471,7 @@ private fun ErrorScreen(message: String, onRetry: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Text(
                 "Can't reach the wire.",
-                color = Ink.Parchment,
+                color = Ink.Text,
                 fontFamily = Serif,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 fontWeight = FontWeight.Bold,
@@ -429,7 +487,7 @@ private fun ErrorScreen(message: String, onRetry: () -> Unit) {
             )
             Spacer(Modifier.height(20.dp))
             Surface(
-                color = Ink.Brass,
+                color = Ink.Primary,
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.clickable(onClick = onRetry),
             ) {
@@ -437,11 +495,11 @@ private fun ErrorScreen(message: String, onRetry: () -> Unit) {
                     Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Ink.OnBrass, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Ink.OnPrimary, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "RETRY THE WIRE",
-                        color = Ink.OnBrass,
+                        color = Ink.OnPrimary,
                         fontFamily = Mono,
                         fontSize = 10.sp,
                         letterSpacing = 1.6.sp,
