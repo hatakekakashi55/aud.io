@@ -1,0 +1,21 @@
+# Android build & cache
+.gradle/
+**/build/
+*.iml
+.idea/
+local.properties
+.kotlin/
+*.log
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

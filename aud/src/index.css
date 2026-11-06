@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: #0a0a0f;
+  color: #f5f5f7;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+.nice-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: #2a2a36;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3a3a48;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.nice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a36 transparent;
+}
+
+/* ── Content column: hide chrome until hover ────────────── */
+.hover-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.hover-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.hover-scroll:hover::-webkit-scrollbar-thumb {
+  background: #2a2a36;
+  border-radius: 999px;
+}
+
+/* ── Range inputs (volume + seek) ───────────────────────── */
+input[type='range'].aud-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 16px;
+}
+input[type='range'].aud-range::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #1ed760 0%,
+    #1ed760 var(--fill, 50%),
+    #3a3a48 var(--fill, 50%),
+    #3a3a48 100%
+  );
+}
+input[type='range'].aud-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  height: 15px;
+  width: 15px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease;
+}
+input[type='range'].aud-range:hover::-webkit-slider-thumb,
+input[type='range'].aud-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+input[type='range'].aud-range::-moz-range-track {
+  height: 5px;
+  border-radius: 999px;
+  background: #3a3a48;
+}
+input[type='range'].aud-range::-moz-range-progress {
+  height: 5px;
+  border-radius: 999px;
+  background: #1ed760;
+}
+input[type='range'].aud-range::-moz-range-thumb {
+  height: 15px;
+  width: 15px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Equalizer bars (now playing indicator) ─────────────── */
+.eq-bar {
+  transform-origin: bottom;
+  border-radius: 2px;
+}
+.reduce-motion .eq-bar {
+  animation: none !important;
+  transform: scaleY(0.6);
+}
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ── Compact density mode ───────────────────────────────── */
+.compact .song-row {
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+}
+.compact .song-thumb {
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+/* ── Card hover sheen ───────────────────────────────────── */
+.media-card {
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.media-card:hover {
+  background-color: #22222d;
+}
+.media-card .play-fab {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.media-card:hover .play-fab,
+.media-card:focus-within .play-fab {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Skeleton shimmer ───────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(110deg, #1a1a23 30%, #24242f 50%, #1a1a23 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 0.75rem;
+}
+
+/* ── Text clamp helpers ─────────────────────────────────── */
+.clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid #1ed760;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
