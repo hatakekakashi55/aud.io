@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AUD · home redesign preview</title>
+<style>
+  :root {
+    --bg:#111714; --paper:#171F1B; --raised:#1F2923; --line:#2A352E;
+    --text:#E3EAE3; --muted:#A6B1A9; --faint:#8A958D;
+    --primary:#9ED9B8; --deep:#6FAF8C; --on-primary:#0C2418;
+    --accent:#E8B48A; --signal:#E3A387;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; background:#0B0F0D; font-family: var(--sans); }
+  body {
+    display:flex; align-items:center; justify-content:center; gap:28px;
+    padding:24px; color: var(--text);
+  }
+  /* ── page chrome ───────────────────────────────────────────── */
+  .side { max-width: 280px; font-size:13px; line-height:1.55; color:#8A958D; }
+  .side h1 { color:#E3EAE3; font-family:var(--serif); font-size:22px; margin:0 0 6px; font-weight:600; }
+  .side .kicker { color: var(--accent); font-family: var(--mono); font-size:9.5px; letter-spacing:2px; text-transform:uppercase; }
+  .side ul { padding-left:16px; margin:12px 0 0; }
+  .side li { margin-bottom:7px; }
+  .side b { color:#C9D3CC; font-weight:600; }
+  .swatches { display:flex; gap:8px; margin-top:16px; }
+  .swatch { width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.08); }
+  @media (max-width: 900px) { .side { display:none; } body { padding:0; } }
+
+  /* ── phone ─────────────────────────────────────────────────── */
+  .phone {
+    position:relative; width: 392px; height: 812px; max-height: calc(100vh - 24px);
+    background: var(--bg); border-radius: 34px; overflow:hidden;
+    border: 1px solid #263029; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 8px #0d1210;
+    display:flex; flex-direction:column;
+  }
+  @media (max-width: 460px) {
+    .phone { width:100vw; height:100vh; max-height:none; border-radius:0; border:0; box-shadow:none; }
+  }
+  .scroll { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; padding-bottom:8px; }
+  .scroll::-webkit-scrollbar { display:none; }
+
+  .mono { font-family: var(--mono); }
+  .kicker { font-family: var(--mono); font-size:9.5px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); }
+  .kicker.primary { color: var(--primary); }
+  h2.sec { font-family: var(--serif); font-size:21px; font-weight:700; margin:5px 0 0; color:var(--text); }
+  .pad { padding-left:20px; padding-right:20px; }
+  .hairline { height:1px; background:var(--line); }
+
+  /* masthead */
+  .masthead { padding: 20px 20px 18px; }
+  .mast-top { display:flex; align-items:center; justify-content:space-between; }
+  .live {
+    display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(227,163,135,.55);
+    background: rgba(227,163,135,.12); color: var(--signal); border-radius:999px;
+    padding:5px 10px; font-family:var(--mono); font-size:8px; letter-spacing:2px;
+  }
+  .live i { width:6px; height:6px; border-radius:50%; background:var(--signal); display:block; }
+  .date { color: var(--faint); font-family:var(--mono); font-size:9px; letter-spacing:1.4px; margin-top:6px; }
+  .headline { font-family:var(--serif); font-size:34px; line-height:1.15; margin-top:16px; }
+  .headline .accent { color: var(--primary); font-style:italic; font-weight:700; }
+  .counts { color:var(--muted); font-family:var(--mono); font-size:9px; letter-spacing:1.5px; margin-top:10px; }
+
+  /* hero */
+  .hero {
+    margin: 20px; border-radius:22px; height:180px; padding:20px; position:relative;
+    background: linear-gradient(135deg, #22392C, #161F1A);
+    border:1px solid rgba(158,217,184,.30); cursor:pointer;
+  }
+  .hero .side-a { font-family:var(--mono); font-size:8.5px; letter-spacing:2px; color:var(--accent); text-transform:uppercase; }
+  .hero .title { font-family:var(--serif); font-style:italic; font-weight:700; font-size:28px; margin-top:22px; }
+  .hero .sub { font-family:var(--mono); font-size:9px; letter-spacing:1.4px; color:var(--muted); margin-top:4px; }
+  .hero .play {
+    position:absolute; right:18px; bottom:16px; background:var(--primary); color:var(--on-primary);
+    border-radius:999px; padding:11px 18px; font-family:var(--mono); font-size:9.5px; letter-spacing:1.6px;
+    border:0; cursor:pointer;
+  }
+
+  /* feed controls */
+  .feed-row { display:flex; align-items:center; gap:10px; padding: 0 20px; margin-top:10px; }
+  .feed-row small { color:var(--faint); font-family:var(--mono); font-size:8.5px; letter-spacing:.6px; flex:1; }
+  .reset-btn {
+    display:inline-flex; align-items:center; gap:7px; border-radius:999px; padding:9px 12px;
+    border:1px solid rgba(158,217,184,.45); color:var(--primary); background:transparent;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:1.3px; cursor:pointer; white-space:nowrap;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  .reset-btn.armed { border-color: var(--signal); color: var(--signal); background: rgba(227,163,135,.10); }
+  .reset-btn.fresh { border-color: var(--line); color: var(--faint); cursor: default; }
+
+  /* rails */
+  .rail { display:flex; gap:14px; overflow-x:auto; padding: 10px 20px 0; scrollbar-width:none; }
+  .rail::-webkit-scrollbar { display:none; }
+  .card { width:132px; flex:0 0 auto; cursor:pointer; }
+  .art {
+    width:132px; height:132px; border-radius:16px; border:1px solid var(--line);
+    display:grid; place-items:center; overflow:hidden; position:relative;
+  }
+  .art::after {
+    content:""; position:absolute; inset:0;
+    background: radial-gradient(circle at 30% 28%, rgba(255,255,255,.16), transparent 46%),
+                linear-gradient(160deg, rgba(255,255,255,.04), transparent 60%);
+  }
+  .card .t { font-family:var(--serif); font-weight:600; font-size:13px; line-height:1.18; margin-top:8px;
+             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card .a { font-family:var(--mono); font-size:7.5px; letter-spacing:.7px; margin-top:3px; color:var(--muted);
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .a.tamil { color: var(--primary); }
+
+  /* artist tiles */
+  .artist { width:104px; flex:0 0 auto; text-align:center; cursor:pointer; }
+  .artist .pic { width:96px; height:96px; border-radius:50%; margin:0 auto; border:1px solid var(--line); }
+  .artist .n { font-family:var(--serif); font-size:12.5px; font-weight:600; margin-top:8px;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist .c { font-family:var(--mono); font-size:7.5px; letter-spacing:1px; color:var(--faint); margin-top:2px; }
+
+  /* tapes */
+  .tape { width:138px; height:186px; flex:0 0 auto; border-radius:16px; border:1px solid var(--line);
+          padding:12px; position:relative; cursor:pointer; }
+  .tape .num { font-family:var(--mono); font-size:8.5px; letter-spacing:2px; color:var(--accent); }
+  .tape .nm { font-family:var(--serif); font-style:italic; font-weight:700; font-size:17px; line-height:1.18;
+              margin-top:26px; max-height:60px; overflow:hidden; }
+  .tape .n { font-family:var(--mono); font-size:8px; letter-spacing:1.4px; color:var(--muted);
+             position:absolute; bottom:44px; left:12px; }
+  .tape .pb { position:absolute; bottom:12px; left:12px; width:26px; height:26px; border-radius:50%;
+              background:var(--primary); display:grid; place-items:center; color:var(--on-primary); font-size:11px; }
+
+  /* liner rows */
+  .row { display:flex; align-items:center; gap:12px; padding:11px 20px; cursor:pointer; }
+  .row .idx { font-family:var(--mono); font-size:11px; color:var(--faint); width:22px; }
+  .row .rowart { width:48px; height:48px; border-radius:10px; border:1px solid var(--line); flex:0 0 auto; }
+  .row .meta { flex:1; min-width:0; }
+  .row .rt { font-family:var(--serif); font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .ra { font-family:var(--mono); font-size:9px; letter-spacing:.8px; color:var(--muted); margin-top:3px;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .dur { font-family:var(--mono); font-size:10px; color:var(--faint); }
+  .row.playing .rt, .row.playing .idx { color: var(--primary); }
+
+  /* mini player + nav */
+  .mini { margin:6px 12px 0; border-radius:14px; background:var(--raised); border:1px solid var(--line); overflow:hidden; }
+  .mini .bar { height:2px; background:var(--line); }
+  .mini .bar i { display:block; height:2px; width:42%; background:var(--primary); }
+  .mini .body { display:flex; align-items:center; gap:11px; padding:9px 10px; cursor:pointer; }
+  .mini .m-art { width:44px; height:44px; border-radius:11px; flex:0 0 auto; border:1px solid var(--line); }
+  .mini .m-meta { flex:1; min-width:0; }
+  .mini .m-kick { font-family:var(--mono); font-size:6.5px; letter-spacing:1.6px; color:var(--primary); }
+  .mini .m-t { font-family:var(--serif); font-weight:600; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mini .m-a { font-family:var(--mono); font-size:7.5px; letter-spacing:.7px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mini .m-play { width:38px; height:38px; border-radius:50%; background:var(--primary); display:grid; place-items:center;
+                  color:var(--on-primary); border:0; cursor:pointer; font-size:13px; }
+
+  nav { display:flex; justify-content:space-evenly; align-items:center; height:64px; background:var(--paper);
+        border-top:1px solid var(--line); }
+  nav button { background:none; border:0; color:var(--muted); font-family:var(--mono); font-size:8px;
+               letter-spacing:1.9px; display:grid; gap:4px; justify-items:center; cursor:pointer; padding:6px 18px; }
+  nav button.on { color: var(--primary); }
+  nav button .ic { font-size:17px; line-height:1; }
+  nav button .tick { width:18px; height:2px; border-radius:1px; background:transparent; }
+  nav button.on .tick { background: var(--primary); }
+
+  /* toast */
+  .toast {
+    position:absolute; left:12px; right:12px; bottom:150px; z-index:5;
+    display:flex; align-items:center; gap:9px; padding:10px 14px; border-radius:12px;
+    background: rgba(158,217,184,.12); border:1px solid rgba(158,217,184,.35); color:var(--primary);
+    font-family:var(--mono); font-size:8.5px; letter-spacing:1.2px;
+    opacity:0; transform: translateY(8px); transition: opacity .22s, transform .22s; pointer-events:none;
+  }
+  .toast.show { opacity:1; transform:none; }
+  .toast i { width:7px; height:7px; border-radius:50%; background:var(--primary); }
+
+  /* shelf / find */
+  .tune { margin: 6px 20px 0; border-radius:18px; background:var(--raised); border:1px solid var(--line); padding:16px; }
+  .tune p { font-family:var(--sans); font-size:12.5px; line-height:1.45; color:var(--muted); margin:6px 0 12px; }
+  .search { margin: 8px 20px 0; }
+  .search .lbl { color:var(--faint); font-family:var(--mono); font-size:8px; letter-spacing:2px; }
+  .search .field { font-family:var(--serif); font-size:20px; margin-top:8px; color:var(--faint); }
+  .search .under { height:1.5px; background:var(--primary); margin-top:8px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; padding:12px 20px 0; }
+  .chip { border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-family:var(--mono);
+          font-size:9.5px; letter-spacing:1.3px; color:var(--text); cursor:pointer; background:none; }
+  .chip:hover { border-color: var(--primary); color: var(--primary); }
+  .note { color:var(--faint); font-family:var(--mono); font-size:8px; letter-spacing:1.6px; padding: 14px 20px 0; }
+  .mt { margin-top:22px; }
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="kicker">Design preview</div>
+  <h1>AUD — Android home</h1>
+  <p>A pixel mock of the rebuilt Jetpack Compose home page. Tap <b>RESET FEED</b> twice to feel the reset flow, and switch tabs at the bottom.</p>
+  <ul>
+    <li><b>Tamil-first feed</b> — Tamil rails lead, a short world tail follows.</li>
+    <li><b>Reset</b> — two taps, returns the feed to the Tamil shelf.</li>
+    <li><b>New palette</b> — deep moss + soft sage, AA-legible text.</li>
+  </ul>
+  <div class="swatches">
+    <div class="swatch" style="background:#111714"></div>
+    <div class="swatch" style="background:#1F2923"></div>
+    <div class="swatch" style="background:#9ED9B8"></div>
+    <div class="swatch" style="background:#E8B48A"></div>
+    <div class="swatch" style="background:#E3EAE3"></div>
+  </div>
+</aside>
+
+<div class="phone">
+  <div class="scroll" id="scroll"></div>
+  <div class="mini" id="mini" style="display:none">
+    <div class="bar"><i></i></div>
+    <div class="body">
+      <div class="m-art" id="m-art"></div>
+      <div class="m-meta">
+        <div class="m-kick">NOW SPINNING</div>
+        <div class="m-t" id="m-t"></div>
+        <div class="m-a" id="m-a"></div>
+      </div>
+      <button class="m-play" id="m-play">❚❚</button>
+    </div>
+  </div>
+  <nav id="nav"></nav>
+  <div class="toast" id="toast"><i></i><span id="toast-msg"></span></div>
+</div>
+
+<script>
+/* ── palette helpers ─────────────────────────────────────── */
+const PALETTE = [['#24402F','#121B16','#9ED9B8'],['#203A34','#101A18','#7FD3C3'],
+                 ['#2E3A26','#151A12','#B9C08A'],['#3A3226','#1A1712','#E8B48A'],
+                 ['#1F3330','#111A19','#8FD3BE'],['#32352A','#191A14','#CFC79B']];
+const art = (i, size, r=16) => {
+  const p = PALETTE[i % PALETTE.length];
+  return `background:
+    radial-gradient(circle at 30% 30%, ${p[2]}22, transparent 46%),
+    radial-gradient(circle at 30% 30%, ${p[2]}55 0 18%, transparent 19%),
+    linear-gradient(160deg, ${p[0]}, ${p[1]}); border-radius:${r}px;`;
+};
+
+/* ── demo shelf (mirrors the live catalog shape) ─────────── */
+const TAMIL = [
+  ['Naan Pizhai','ANIRUDH RAVICHANDER','TAMIL',252],
+  ['Munbe Vaa','A. R. RAHMAN','TAMIL',331],
+  ['Kannana Kanne','YUVAN SHANKAR RAJA','TAMIL',268],
+  ['Rowdy Baby','DHEENA · SAI SHANKAR','TAMIL',245],
+  ['Nenjukkul Peidhidum','HARRIS JAYARAJ','TAMIL',324],
+  ['Megham Karukatha','SANTHOSH NARAYANAN','TAMIL',286],
+  ['Ponni Nadhi','A. R. RAHMAN','TAMIL',289],
+  ['Adi Penne','G. V. PRAKASH','TAMIL',241],
+  ['Vaathi Coming','ANIRUDH RAVICHANDER','TAMIL',218],
+  ['Hukum','ANIRUDH RAVICHANDER','TAMIL',200],
+  ['Naa Ready','ANIRUDH RAVICHANDER','TAMIL',213],
+  ['Chinnanjiru Nilave','A. R. RAHMAN','TAMIL',303],
+  ['Kadhal Sadugudu','A. R. RAHMAN','TAMIL',312],
+  ['Yaaro Ivan','YUVAN SHANKAR RAJA','TAMIL',279],
+  ['Marana Matta','SANTHOSH NARAYANAN','TAMIL',258],
+  ['Ranjithame','ANIRUDH RAVICHANDER','TAMIL',234],
+];
+const WORLD = [
+  ['Kesariya','ARJIT SINGH','HINDI',268],
+  ['Butta Bomma','ARMAAN MALIK','TELUGU',241],
+  ['Blinding Lights','THE WEEKND','ENGLISH',200],
+  ['Dynamite','BTS','KOREAN',199],
+  ['Tum Hi Ho','ARIJIT SINGH','HINDI',262],
+];
+const MIXES = [
+  ['Tamil Top 40','20'],['Anirudh','20'],['A. R. Rahman','20'],['Ilaiyaraaja','20'],
+  ['Tamil Love','20'],['Kuthu & Mass','20'],['Melody Nights','20'],['Yuvan','20'],
+  ['Bollywood Hits','20'],['English Pop','20'],
+];
+const ARTISTS = [
+  ['Anirudh Ravichander','42 TRACKS'],['A. R. Rahman','38 TRACKS'],['Yuvan Shankar Raja','26 TRACKS'],
+  ['Santhosh Narayanan','22 TRACKS'],['Harris Jayaraj','19 TRACKS'],['Ilaiyaraaja','17 TRACKS'],
+  ['G. V. Prakash','14 TRACKS'],['Dhanush','11 TRACKS'],
+];
+
+/* ── state ───────────────────────────────────────────────── */
+const state = {
+  tab: 'now',
+  fresh: false,          // feed already fresh?
+  rotation: 0,           // bumped by reset → shelf order rotates
+  armed: false,
+  playing: null,
+  liked: new Set(['1','3']),
+  recents: ['4','0','6'],
+};
+const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+function shelf() {
+  const t = TAMIL.map((x,i)=>({...toObj(x), i, tamil:true}));
+  const w = WORLD.map((x,i)=>({...toObj(x), i:i+TAMIL.length, tamil:false}));
+  if (state.fresh) {
+    // Tamil first, rotate the start a little, then a short world tail
+    const rotated = [...t.slice(state.rotation % 6), ...t.slice(0, state.rotation % 6)];
+    return [...rotated, ...w.slice(0, 3)];
+  }
+  // personalised: heavy on Tamil, an occasional world pick
+  return [...t.slice(0,13), w[0], t[13], t[14], w[2], t[15]];
+}
+function toObj([title, artist, lang, dur]) { return { title, artist, lang, dur }; }
+
+/* ── renderers ───────────────────────────────────────────── */
+const el = (html) => html;
+
+function card(t, list) {
+  return `<div class="card" data-play="${encodeURIComponent(JSON.stringify({title:t.title,artist:t.artist,lang:t.lang,dur:t.dur,i:t.i}))}">
+    <div class="art" style="${art(t.i,132)}"></div>
+    <div class="t">${t.title}</div>
+    <div class="a ${t.tamil?'tamil':''}">${t.artist} · ${t.lang}</div>
+  </div>`;
+}
+
+function renderNow() {
+  const list = shelf();
+  const heroTitle = state.fresh ? 'The Tamil Tape' : 'Your Own Tape';
+  const heroKick = state.fresh ? 'SIDE A — FRESH FEED · TAMIL FIRST' : 'SIDE A — MADE FOR YOU';
+  const secTitle = state.fresh ? 'The Tamil shelf' : 'Tuned by your spins';
+  const tamilCount = 96 + state.rotation;
+
+  const resetLabel = state.fresh ? 'FRESH FEED · TAMIL FIRST' : (state.armed ? 'TAP AGAIN TO RESET' : 'RESET FEED');
+  const resetCls = state.fresh ? 'fresh' : (state.armed ? 'armed' : '');
+
+  const trending = [];
+  const world = WORLD.concat(TAMIL.slice(0,3).map((x,i)=>({...toObj(x), i:i+20, tamil:false})));
+  let wi = 0;
+  TAMIL.slice(0,12).forEach((t,i)=>{
+    trending.push({...toObj(t), i, tamil:true});
+    if ((i+1)%3===0 && wi < WORLD.length) trending.push({...toObj(WORLD[wi]), i:40+wi++, tamil:false});
+  });
+
+  return `
+  <div class="masthead">
+    <div class="mast-top">
+      <div class="kicker primary">GOOD EVENING — THE LISTENING POST</div>
+      <span class="live"><i></i>LIVE</span>
+    </div>
+    <div class="date">THURSDAY, 6 NOVEMBER</div>
+    <div class="headline">Your Tamil room,<br><span class="accent">the world outside.</span></div>
+    <div class="counts">${tamilCount} TAMIL TRACKS · ${tamilCount + WORLD.length + 12} TOTAL · ALL LIVE</div>
+  </div>
+  <div class="hairline" style="margin:0 20px"></div>
+
+  <div class="hero" data-play="${encodeURIComponent(JSON.stringify({queue:list, at:0}))}">
+    <div class="side-a">${heroKick}</div>
+    <div class="title">${heroTitle}</div>
+    <div class="sub">${list.length} TRACKS, TUNED TO YOUR SPINS</div>
+    <button class="play" data-play="${encodeURIComponent(JSON.stringify({queue:list, at:0}))}">PLAY FOR YOU</button>
+  </div>
+
+  <div class="pad">
+    <div class="kicker">For you</div>
+    <h2 class="sec">${secTitle}</h2>
+  </div>
+  <div class="feed-row">
+    <small>${state.fresh ? 'Nothing played yet — this is the fresh Tamil shelf.' : 'Ranks by your spins · always Tamil-first'}</small>
+    <button class="reset-btn ${resetCls}" id="reset">↺ ${resetLabel}</button>
+  </div>
+  <div class="rail">${list.slice(0,10).map(t=>card(t,list)).join('')}</div>
+
+  <div class="pad mt"><div class="kicker">Jump back in</div><h2 class="sec">Your last spins</h2></div>
+  <div class="rail">${state.recents.map((i,idx)=>card({...toObj(TAMIL[+i]||TAMIL[0]), i:+i, tamil:true},[])).join('')}</div>
+
+  <div class="pad mt"><div class="kicker">Tamil now</div><h2 class="sec">Trending in Tamil</h2></div>
+  <div class="rail">${TAMIL.slice(0,12).map((t,i)=>card({...toObj(t), i:i+2, tamil:true},[])).join('')}</div>
+
+  <div class="pad mt"><div class="kicker">Voices</div><h2 class="sec">Artists you'll love</h2></div>
+  <div class="rail">${ARTISTS.map(([n,c],i)=>`
+    <div class="artist" data-play="${encodeURIComponent(JSON.stringify({queue:[{title:n,artist:'ESSENTIALS',lang:'TAMIL',dur:240,i}],at:0}))}">
+      <div class="pic" style="${art(i+1,96,48)}"></div>
+      <div class="n">${n}</div><div class="c">${c}</div>
+    </div>`).join('')}</div>
+
+  <div class="hairline mt" style="margin-left:20px;margin-right:20px"></div>
+  <div class="pad mt"><div class="kicker">The Shelf</div><h2 class="sec">Pick a tape, any corner</h2></div>
+  <div class="rail">${MIXES.map(([n,c],i)=>`
+    <div class="tape" style="${art(i,138,16)}" data-play="${encodeURIComponent(JSON.stringify({queue:list,at:i}))}">
+      <div class="num">TAPE ${String(i+1).padStart(2,'0')}</div>
+      <div class="nm">${n}</div>
+      <div class="n">${c} TRACKS</div>
+      <div class="pb">▶</div>
+    </div>`).join('')}</div>
+
+  <div class="hairline mt" style="margin-left:20px;margin-right:20px"></div>
+  <div class="pad mt">
+    <div class="kicker">The Chart</div><h2 class="sec">Trending right now</h2>
+    <div style="color:var(--faint);font-family:var(--mono);font-size:8px;letter-spacing:1.6px;margin-top:6px">TAMIL LEADS · A WORLD OF GUESTS</div>
+  </div>
+  <div style="margin-top:6px">
+    ${trending.map((t,i)=>`
+      <div class="row ${state.playing&&state.playing.title===t.title?'playing':''}" data-play="${encodeURIComponent(JSON.stringify({queue:trending,at:i}))}">
+        <div class="idx">${String(i+1).padStart(2,'0')}</div>
+        <div class="rowart" style="${art(t.i,48,10)}"></div>
+        <div class="meta"><div class="rt">${t.title}</div><div class="ra">${t.artist} · ${t.lang}</div></div>
+        <div class="dur">${fmt(t.dur)}</div>
+      </div>
+      <div class="hairline" style="margin:0 20px 0 56px"></div>`).join('')}
+  </div>
+  <div style="text-align:center;padding:26px 0 6px">
+    <div class="hairline" style="margin:0 60px 12px"></div>
+    <div class="mono" style="font-size:8px;letter-spacing:2.2px;color:var(--faint)">AUD · THE LISTENING POST</div>
+    <div class="mono" style="font-size:7px;letter-spacing:1.3px;color:var(--faint);margin-top:4px">EVERY TRACK STREAMS LIVE — NOTHING PRE-DOWNLOADED</div>
+  </div>`;
+}
+
+function renderFind() {
+  return `
+  <div class="pad" style="padding-top:20px"><div class="kicker">The Archive</div><h2 class="sec">What shall we play?</h2></div>
+  <div class="search">
+    <div class="lbl">SEARCH THE STACK AND THE WIRE</div>
+    <div class="field">Song, artist, album…</div>
+    <div class="under"></div>
+  </div>
+  <div class="pad mt"><div class="kicker">Shortcuts</div><h2 class="sec">Quick searches</h2></div>
+  <div class="chips">
+    ${['ANIRUDH','A. R. RAHMAN','ILAIYARAAJA','YUVAN','KUTHU','TAMIL LOVE','MELODY','DHANUSH'].map(c=>`<button class="chip">${c}</button>`).join('')}
+  </div>
+  <div class="note">TYPE THREE CHARACTERS — THE WIRE ANSWERS FRESH.</div>
+  <div class="pad mt"><div class="kicker">From the wire</div><h2 class="sec">Fresh this minute</h2></div>
+  <div style="margin-top:6px">
+    ${TAMIL.slice(0,6).map((t,i)=>`
+      <div class="row" data-play="${encodeURIComponent(JSON.stringify({queue:TAMIL.slice(0,6).map((x,j)=>({...toObj(x),i:j,tamil:true})),at:i}))}">
+        <div class="idx">${String(i+1).padStart(2,'0')}</div>
+        <div class="rowart" style="${art(i,48,10)}"></div>
+        <div class="meta"><div class="rt">${t[0]}</div><div class="ra">${t[1]} · TAMIL</div></div>
+        <div class="dur">${fmt(t[3])}</div>
+      </div>
+      <div class="hairline" style="margin:0 20px 0 56px"></div>`).join('')}
+  </div>`;
+}
+
+function renderShelf() {
+  return `
+  <div class="pad" style="padding-top:20px"><div class="kicker">Your shelf</div><h2 class="sec">Collection</h2></div>
+  <div class="tune">
+    <div class="kicker" style="color:var(--accent)">FEED TUNING</div>
+    <p>For You learns from every spin — artists, language, repeats. Reset it and the home feed starts again from the Tamil shelf. Your likes and recents stay put.</p>
+    <button class="reset-btn ${state.fresh?'fresh':(state.armed?'armed':'')}" id="reset-shelf">↺ ${state.fresh?'FRESH FEED · TAMIL FIRST':(state.armed?'TAP AGAIN TO RESET':'RESET FEED')}</button>
+  </div>
+  <div class="pad mt"><div class="kicker">Saved</div><h2 class="sec">02 tracks</h2></div>
+  <div style="margin-top:6px">
+    ${TAMIL.slice(0,4).map((t,i)=>`
+      <div class="row">
+        <div class="idx">${String(i+1).padStart(2,'0')}</div>
+        <div class="rowart" style="${art(i,48,10)}"></div>
+        <div class="meta"><div class="rt">${t[0]}</div><div class="ra">${t[1]} · TAMIL</div></div>
+        <div class="dur">♥</div>
+      </div>
+      <div class="hairline" style="margin:0 20px 0 56px"></div>`).join('')}
+  </div>`;
+}
+
+/* ── shell ───────────────────────────────────────────────── */
+const scroll = document.getElementById('scroll');
+const nav = document.getElementById('nav');
+const toast = document.getElementById('toast');
+const toastMsg = document.getElementById('toast-msg');
+const mini = document.getElementById('mini');
+
+function render() {
+  scroll.scrollTop = 0;
+  scroll.innerHTML = state.tab === 'now' ? renderNow() : state.tab === 'find' ? renderFind() : renderShelf();
+  nav.innerHTML = [
+    ['now','◉','NOW'],['find','⌕','FIND'],['shelf','▤','SHELF']
+  ].map(([id,ic,label])=>`<button class="${state.tab===id?'on':''}" data-tab="${id}">
+      <span class="ic">${ic}</span>${label}<span class="tick"></span></button>`).join('');
+  const r = document.getElementById('reset');
+  if (r) r.onclick = onResetBtn;
+  const rs = document.getElementById('reset-shelf');
+  if (rs) rs.onclick = onResetBtn;
+  // play handlers
+  document.querySelectorAll('[data-play]').forEach(node => {
+    node.onclick = (e) => {
+      e.stopPropagation();
+      const payload = JSON.parse(decodeURIComponent(node.dataset.play));
+      const track = payload.queue ? payload.queue[payload.at] : payload;
+      play(track);
+    };
+  });
+  nav.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
+}
+
+function play(track) {
+  state.playing = track;
+  mini.style.display = 'block';
+  document.getElementById('m-art').style = art(track.i || 0, 44, 11);
+  document.getElementById('m-t').textContent = track.title;
+  document.getElementById('m-a').textContent = `${track.artist} · ${track.lang}`;
+  flash(`NOW SPINNING — ${track.title.toUpperCase()}`);
+  render();
+}
+
+let toastTimer = null;
+function flash(msg) {
+  toastMsg.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toast.classList.remove('show'), 2600);
+}
+
+let armTimer = null;
+function onResetBtn() {
+  if (state.fresh) return;
+  if (!state.armed) {
+    state.armed = true;
+    render();
+    clearTimeout(armTimer);
+    armTimer = setTimeout(()=>{ state.armed = false; render(); }, 4000);
+    return;
+  }
+  // second tap within 4s → reset
+  state.armed = false;
+  state.fresh = true;
+  state.rotation += 3;
+  state.recents = [];
+  render();
+  flash('FEED RESET — THE TAMIL SHELF IS BACK');
+}
+
+document.getElementById('m-play').onclick = (e) => {
+  e.stopPropagation();
+  const b = e.currentTarget;
+  b.textContent = b.textContent === '❚❚' ? '▶' : '❚❚';
+};
+
+render();
+</script>
+</body>
+</html>
