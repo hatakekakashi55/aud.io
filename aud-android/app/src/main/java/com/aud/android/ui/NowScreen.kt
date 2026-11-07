@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.FitnessCenter
-import androidx.compose.material.icons.rounded.Settings as SettingsIcon
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -442,7 +442,7 @@ fun NowScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        SettingsIcon,
+                        Icons.Rounded.Settings,
                         contentDescription = null,
                         tint = Ink.Muted,
                         modifier = Modifier.size(14.dp),
