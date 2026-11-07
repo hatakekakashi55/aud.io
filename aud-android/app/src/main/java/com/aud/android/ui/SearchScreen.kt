@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -47,7 +48,11 @@ private sealed interface WireState {
     data object Error : WireState
 }
 
-private val QUICK = listOf("Anirudh", "A. R. Rahman", "Ilaiyaraaja", "Kuthu", "Sad", "Bollywood", "Love")
+private val QUICK = listOf(
+    "Anirudh", "A. R. Rahman", "Ilaiyaraaja", "Sid Sriram",
+    "Kuthu", "Tamil Love", "Tamil Sad", "Harris Jayaraj",
+    "Yuvan", "Tamil Rap", "Bollywood", "Tamil Indie",
+)
 
 /** The archive — instant local matches, plus a live "From the Wire" search. */
 @Composable
@@ -143,7 +148,11 @@ fun SearchScreen(
             /* Quick searches */
             item(key = "quick-kicker") {
                 Spacer(Modifier.height(18.dp))
-                SectionHeader(kicker = "Shortcuts", title = "Quick searches")
+                SectionHeader(
+                    kicker = "Shortcuts",
+                    title = "Quick searches",
+                    subtitle = "Tamil first — the rest of the map underneath.",
+                )
             }
             item(key = "quick-chips") {
                 FlowChips(values = QUICK, onPick = { query = it })
@@ -229,29 +238,28 @@ private fun WireStatus(text: String) {
     }
 }
 
-/** Editorial outlined chips, wrapped with a manual flow layout. */
+/** Editorial outlined chips, wrapped automatically so no row ever overflows. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FlowChips(values: List<String>, onPick: (String) -> Unit) {
-    // Simple two-row layout — enough for the fixed shortcut list.
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-        val rows = listOf(values.take(4), values.drop(4))
-        rows.filter { it.isNotEmpty() }.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
-                row.forEach { value ->
-                    Text(
-                        value.uppercase(),
-                        color = Ink.Parchment,
-                        fontFamily = Mono,
-                        fontSize = 9.5.sp,
-                        letterSpacing = 1.3.sp,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(1.dp, Ink.Line, RoundedCornerShape(6.dp))
-                            .clickable { onPick(value) }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
+    FlowRow(
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        values.forEach { value ->
+            Text(
+                value.uppercase(),
+                color = Ink.Parchment,
+                fontFamily = Mono,
+                fontSize = 9.5.sp,
+                letterSpacing = 1.3.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .border(1.dp, Ink.Line, RoundedCornerShape(6.dp))
+                    .clickable { onPick(value) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
     }
 }

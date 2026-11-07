@@ -68,6 +68,7 @@ fun FullPlayerContent(
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenArtist: () -> Unit,
 ) {
     val track = playback.current ?: return
     val duration = playback.durationSec.coerceAtLeast(1)
@@ -78,7 +79,7 @@ fun FullPlayerContent(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF241B11), Ink.Background, Ink.Background)
+                    listOf(Color(0xFF1B3230), Ink.Background, Ink.Background)
                 )
             ),
     ) {
@@ -155,19 +156,35 @@ fun FullPlayerContent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    buildString {
-                        append(track.artistName.uppercase())
-                        if (track.releaseYear > 0) append("  ·  ${track.releaseYear}")
-                    },
-                    color = Ink.Muted,
-                    fontFamily = Mono,
-                    fontSize = 9.5.sp,
-                    letterSpacing = 1.1.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable(onClick = onOpenArtist)
+                        .padding(vertical = 4.dp, horizontal = 0.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        buildString {
+                            append(track.artistName.uppercase())
+                            if (track.isTamil) append("  ·  தமிழ்") else if (track.language.isNotBlank()) append("  ·  ${track.language.uppercase()}")
+                        },
+                        color = Ink.Muted,
+                        fontFamily = Mono,
+                        fontSize = 9.5.sp,
+                        letterSpacing = 1.1.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "ABOUT THE ARTIST ›",
+                        color = Ink.Brass,
+                        fontFamily = Mono,
+                        fontSize = 8.sp,
+                        letterSpacing = 1.2.sp,
+                    )
+                }
 
                 Spacer(Modifier.height(14.dp))
 
