@@ -3,8 +3,10 @@ package com.aud.android.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aud.android.data.Catalog
@@ -39,15 +44,25 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-/** The front page — a relaxed, worldwide listening room typeset like a music paper. */
+/**
+ * The front page — a Tamil-first listening room with many rails, so there is
+ * always another shelf below the fold instead of the same handful of songs.
+ *
+ * Order is deliberate: personalized For You → fresh Tamil → Tamil artists →
+ * the Tamil shelves (romance, energy, canon, composers, voices, indie, roots) →
+ * the rest of India → the world → the chart.
+ */
 @Composable
 fun NowScreen(
     catalog: Catalog,
     forYou: List<Track>,
     currentTrackId: String?,
     isPlaying: Boolean,
+    isFreshProfile: Boolean,
+    becauseYou: Pair<String, List<Track>>?,
     onPlay: (List<Track>, Int) -> Unit,
-    bottomPadding: androidx.compose.ui.unit.Dp,
+    onOpenArtist: (String) -> Unit,
+    bottomPadding: Dp,
 ) {
     val now = remember { Calendar.getInstance() }
     val hour = now.get(Calendar.HOUR_OF_DAY)
@@ -61,12 +76,25 @@ fun NowScreen(
         SimpleDateFormat("EEEE, d MMMM", Locale.ENGLISH).format(Calendar.getInstance().time)
             .uppercase(Locale.ENGLISH)
     }
-    val chart = remember(catalog) { catalog.tracks.take(30) }
-    val heroQueue = forYou.ifEmpty { catalog.tracks }
+
+    val shelves = remember(catalog) { catalog.shelves }
+    val chartShelf = remember(shelves) { shelves.firstOrNull { it.key == "charts" } }
+    val bodyShelves = remember(shelves) { shelves.filterNot { it.key == "charts" } }
+    val heroQueue = forYou.ifEmpty { catalog.tamilTracks.ifEmpty { catalog.tracks } }
+    val tamilShare = remember(catalog) { (catalog.tamilShare * 100).toInt() }
+    val topArtists = remember(catalog) {
+        catalog.tamilTracks.ifEmpty { catalog.tracks }
+            .groupBy { it.leadArtist }
+            .mapValues { (_, rows) -> rows }
+            .entries
+            .sortedByDescending { it.value.size }
+            .take(14)
+            .map { entry -> entry.key to entry.value.first().imageUrl }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = bottomPadding + 18.dp),
+        contentPadding = PaddingValues(bottom = bottomPadding + 20.dp),
     ) {
         /* ── Masthead ── */
         item(key = "masthead") {
@@ -86,57 +114,57 @@ fun NowScreen(
                 Text(dateLine, color = Ink.Faint, fontFamily = Mono, fontSize = 9.sp, letterSpacing = 1.4.sp)
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "Every song live,",
+                    "Tamil first,",
                     color = Ink.Parchment,
                     fontFamily = Serif,
                     fontWeight = FontWeight.Normal,
-                    fontSize = 37.sp,
-                    lineHeight = 43.sp,
+                    fontSize = 36.sp,
+                    lineHeight = 42.sp,
                 )
                 Text(
-                    "straight from the wire.",
+                    "then the whole world.",
                     color = Ink.Brass,
                     fontFamily = Serif,
                     fontStyle = FontStyle.Italic,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 37.sp,
-                    lineHeight = 43.sp,
+                    fontSize = 36.sp,
+                    lineHeight = 42.sp,
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "WORLDWIDE CATALOG · ALWAYS LIVE · NO FILLER",
+                    "$tamilShare% TAMIL · ${catalog.tracks.size} LIVE TRACKS · ${catalog.shelves.size} SHELVES",
                     color = Ink.Muted,
                     fontFamily = Mono,
                     fontSize = 8.5.sp,
-                    letterSpacing = 1.5.sp,
+                    letterSpacing = 1.4.sp,
                 )
             }
         }
 
         item(key = "rule1") { Hairline(Modifier.padding(horizontal = 20.dp)) }
 
-        /* ── Hero — personalized queue, one tap away ── */
+        /* ── Hero — the personalized queue, one tap away ── */
         item(key = "hero") {
             Box(
                 Modifier
                     .padding(horizontal = 20.dp, vertical = 20.dp)
                     .fillMaxWidth()
-                    .height(176.dp)
+                    .height(178.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF2B2318), Color(0xFF1B1815))))
-                    .border(1.dp, Ink.Brass.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF1C3B37), Color(0xFF17211F))))
+                    .border(1.dp, Ink.Brass.copy(alpha = 0.32f), RoundedCornerShape(20.dp))
                     .clickable { onPlay(heroQueue, 0) }
                     .padding(20.dp),
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(
-                        "SIDE A — MADE FOR YOU",
+                        if (isFreshProfile) "SIDE A — TAMIL, TO START YOU OFF" else "SIDE A — MADE FOR YOU",
                         color = Ink.Brass,
                         fontFamily = Mono,
                         fontSize = 8.5.sp,
-                        letterSpacing = 2.sp,
+                        letterSpacing = 1.8.sp,
                     )
-                    Spacer(Modifier.height(22.dp))
+                    Spacer(Modifier.height(20.dp))
                     Text(
                         "The Tonight Tape",
                         color = Ink.Parchment,
@@ -146,11 +174,12 @@ fun NowScreen(
                         fontSize = 27.sp,
                     )
                     Text(
-                        "${heroQueue.size} TRACKS, TUNED TO YOUR SPINS",
+                        if (isFreshProfile) "${heroQueue.size} TRACKS · TAMIL-FIRST, RESET ANYTIME"
+                        else "${heroQueue.size} TRACKS, TUNED TO YOUR SPINS",
                         color = Ink.Muted,
                         fontFamily = Mono,
                         fontSize = 8.5.sp,
-                        letterSpacing = 1.4.sp,
+                        letterSpacing = 1.2.sp,
                     )
                 }
                 Surface(
@@ -160,76 +189,142 @@ fun NowScreen(
                         .align(Alignment.BottomEnd)
                         .clickable { onPlay(heroQueue, 0) },
                 ) {
-                    Text(
-                        "PLAY FOR YOU",
-                        color = Ink.OnBrass,
-                        fontFamily = Mono,
-                        fontSize = 9.sp,
-                        letterSpacing = 1.6.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    )
+                    Row(
+                        Modifier.padding(start = 14.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = Ink.OnBrass,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "PLAY",
+                            color = Ink.OnBrass,
+                            fontFamily = Mono,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.6.sp,
+                        )
+                    }
                 }
             }
         }
 
-        /* ── For You — personalized rail ── */
+        /* ── For You ── */
         item(key = "foryou-header") {
-            SectionHeader(kicker = "For you", title = "Tuned by your spins")
+            SectionHeader(
+                kicker = "For you",
+                title = if (isFreshProfile) "Start here — Tamil first" else "Tuned by your spins",
+                subtitle = if (isFreshProfile) "No history yet, so this is the Tamil-first mix. Reset it anytime in Settings."
+                else "Ranked on this device from what you actually play.",
+            )
             Spacer(Modifier.height(10.dp))
         }
         item(key = "foryou-rail") {
-            LazyRow(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp),
-            ) {
-                itemsIndexed(forYou, key = { _, t -> "foryou-${t.id}" }) { index, track ->
-                    ForYouCard(track = track, onClick = { onPlay(forYou, index) })
-                }
+            TrackRail(tracks = forYou, onPlay = onPlay, keyPrefix = "foryou")
+            Spacer(Modifier.height(20.dp))
+        }
+
+        /* ── Because you played … — only once there is real history ── */
+        if (becauseYou != null) {
+            item(key = "because-header") {
+                Hairline(Modifier.padding(horizontal = 20.dp))
+                Spacer(Modifier.height(14.dp))
+                SectionHeader(
+                    kicker = "Because you played",
+                    title = becauseYou.first,
+                    subtitle = "More from the artist you keep coming back to.",
+                )
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(22.dp))
-        }
-
-        item(key = "mix-rule") { Hairline(Modifier.padding(horizontal = 20.dp)) }
-
-        /* ── The mixes — horizontal tape rail (worldwide shelf) ── */
-        item(key = "mix-header") {
-            Spacer(Modifier.height(14.dp))
-            SectionHeader(kicker = "The Shelf", title = "Pick a tape, any corner")
-            Spacer(Modifier.height(10.dp))
-        }
-        item(key = "mix-rail") {
-            LazyRow(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
-            ) {
-                itemsIndexed(catalog.mixes, key = { _, mix -> mix.title }) { index, mix ->
-                    TapeCard(
-                        index = index,
-                        title = mix.title,
-                        trackCount = mix.trackCount,
-                        onPlay = { onPlay(mix.tracks, 0) },
-                    )
-                }
+            item(key = "because-rail") {
+                TrackRail(
+                    tracks = becauseYou.second,
+                    onPlay = onPlay,
+                    keyPrefix = "because",
+                    cardSize = 128.dp,
+                )
+                Spacer(Modifier.height(20.dp))
             }
-            Spacer(Modifier.height(22.dp))
         }
 
-        item(key = "chart-rule") { Hairline(Modifier.padding(horizontal = 20.dp)) }
-
-        /* ── The chart — still there, but not the whole story ── */
-        item(key = "chart-header") {
-            Spacer(Modifier.height(14.dp))
-            SectionHeader(kicker = "The Chart", title = "Trending right now")
-            Spacer(Modifier.height(8.dp))
+        /* ── Fresh Tamil — horizontal square rail ── */
+        val fresh = bodyShelves.firstOrNull { it.key == "tamil_fresh" }
+        if (fresh != null) {
+            item(key = "fresh-header") {
+                Hairline(Modifier.padding(horizontal = 20.dp))
+                Spacer(Modifier.height(14.dp))
+                SectionHeader(kicker = fresh.kicker, title = fresh.title, subtitle = fresh.subtitle)
+                Spacer(Modifier.height(10.dp))
+            }
+            item(key = "fresh-rail") {
+                TrackRail(tracks = fresh.tracks, onPlay = onPlay, keyPrefix = "fresh", badgeFor = { "NEW" })
+                Spacer(Modifier.height(20.dp))
+            }
         }
-        itemsIndexed(chart, key = { _, t -> "chart-${t.id}" }) { index, track ->
-            LinerRow(
-                index = index,
-                track = track,
-                isCurrent = track.id == currentTrackId,
-                isPlaying = isPlaying,
-                onClick = { onPlay(chart, index) },
-            )
+
+        /* ── Tamil artists ── */
+        if (topArtists.isNotEmpty()) {
+            item(key = "artists-header") {
+                Hairline(Modifier.padding(horizontal = 20.dp))
+                Spacer(Modifier.height(14.dp))
+                SectionHeader(kicker = "Tamil · people", title = "The faces behind the songs")
+                Spacer(Modifier.height(10.dp))
+            }
+            item(key = "artists-rail") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    items(topArtists, key = { "artist-${it.first}" }) { (name, image) ->
+                        ArtistCircle(name = name, imageUrl = image, onClick = { onOpenArtist(name) })
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+
+        /* ── Every other shelf, Tamil first, then India, then the world ── */
+        bodyShelves.filterNot { it.key == "tamil_fresh" }.forEach { shelf ->
+            item(key = "shelf-header-${shelf.key}") {
+                Hairline(Modifier.padding(horizontal = 20.dp))
+                Spacer(Modifier.height(14.dp))
+                SectionHeader(kicker = shelf.kicker, title = shelf.title, subtitle = shelf.subtitle)
+                Spacer(Modifier.height(10.dp))
+            }
+            item(key = "shelf-rail-${shelf.key}") {
+                TrackRail(
+                    tracks = shelf.tracks,
+                    onPlay = onPlay,
+                    keyPrefix = "shelf-${shelf.key}",
+                )
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+
+        /* ── The chart ── */
+        if (chartShelf != null && chartShelf.tracks.isNotEmpty()) {
+            item(key = "chart-header") {
+                Hairline(Modifier.padding(horizontal = 20.dp))
+                Spacer(Modifier.height(14.dp))
+                SectionHeader(
+                    kicker = chartShelf.kicker,
+                    title = chartShelf.title,
+                    subtitle = chartShelf.subtitle,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            itemsIndexed(chartShelf.tracks, key = { _, t -> "chart-${t.id}" }) { index, track ->
+                LinerRow(
+                    index = index,
+                    track = track,
+                    isCurrent = track.id == currentTrackId,
+                    isPlaying = isPlaying,
+                    onClick = { onPlay(chartShelf.tracks, index) },
+                )
+            }
         }
 
         /* ── Colophon ── */
@@ -257,38 +352,27 @@ fun NowScreen(
     }
 }
 
-/** One personalized pick — bigger art, calm typography. */
+/** One horizontal rail of square cards — the home page's building block. */
 @Composable
-private fun ForYouCard(track: Track, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(132.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(bottom = 4.dp),
+fun TrackRail(
+    tracks: List<Track>,
+    onPlay: (List<Track>, Int) -> Unit,
+    keyPrefix: String,
+    cardSize: Dp = 144.dp,
+    badgeFor: (Track) -> String? = { null },
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Artwork(track.imageUrl, track.title, Modifier.size(132.dp), corner = 14.dp, decodeSize = 288)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            track.title,
-            color = Ink.Parchment,
-            fontFamily = Serif,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.5.sp,
-            lineHeight = 15.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            track.shortArtists.uppercase(),
-            color = Ink.Muted,
-            fontFamily = Mono,
-            fontSize = 7.5.sp,
-            letterSpacing = 0.8.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        itemsIndexed(tracks, key = { _, t -> "$keyPrefix-${t.id}" }) { index, track ->
+            SquareCard(
+                track = track,
+                size = cardSize,
+                badge = badgeFor(track),
+                onClick = { onPlay(tracks, index) },
+            )
+        }
     }
 }
 
@@ -297,8 +381,8 @@ fun LivePill() {
     Row(
         Modifier
             .clip(RoundedCornerShape(50))
-            .border(1.dp, Ink.Signal.copy(alpha = 0.55f), RoundedCornerShape(50))
-            .background(Ink.Signal.copy(alpha = 0.12f))
+            .border(1.dp, Ink.Signal.copy(alpha = 0.5f), RoundedCornerShape(50))
+            .background(Ink.Signal.copy(alpha = 0.1f))
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

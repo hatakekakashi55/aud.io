@@ -5,7 +5,7 @@ AUD — a Spotify-style, high-end music listening app, plus its native Android c
 | Path | What it is |
 | ---- | ---------- |
 | [`./aud`](./aud) | The web app — React 19 · TypeScript · Vite · Tailwind · Zustand. Production build verified (`tsc -b`, oxlint 0/0, `vite build`). Ships a bundled demo catalog and is wired to the live BeatBox/JioSaavn worker at `aud29.thangamprabhu1.workers.dev`. |
-| [`./aud-android`](./aud-android) | **AUD for Android — The Listening Post.** Pure Kotlin + Jetpack Compose, editorial identity (brass on relaxed ink, serif/mono type) — worldwide live catalog, a personalized For You feed (on-device ranking), live search, on-device likes/recents, 15-min catalog cache. Written but **not compiled in this environment** — build it in Android Studio; see [`aud-android/README.md`](./aud-android/README.md). |
+| [`./aud-android`](./aud-android) | **AUD for Android — The Listening Post.** Pure Kotlin + Jetpack Compose, editorial identity (sea-glass teal on cool slate, serif/mono type) — **Tamil-first live catalog (54 seed buckets, 38 Tamil)** with ~12 home shelves and artist circles, a personalized For You feed (on-device ranking, ~80 % Tamil for new/reset listeners), **feed reset in Settings**, 5 accent choices / 4 text sizes / high-contrast text, artist pages, live search, on-device likes/recents, 20-min catalog cache. Written but **not compiled in this environment** — build it in Android Studio; see [`aud-android/README.md`](./aud-android/README.md). |
 
 ```bash
 cd aud

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -48,15 +49,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aud.android.data.Appearance
+import com.aud.android.data.Catalog
 import com.aud.android.data.CatalogService
 import com.aud.android.data.Personalize
-import com.aud.android.data.Catalog
 import com.aud.android.data.Store
 import com.aud.android.data.Track
 import com.aud.android.player.PlaybackManager
@@ -70,16 +72,27 @@ private sealed interface CatalogState {
 }
 
 @Composable
-fun AudApp(player: PlaybackManager, store: Store) {
+fun AudApp(
+    player: PlaybackManager,
+    store: Store,
+    appearance: Appearance,
+    onAppearanceChange: (Appearance) -> Unit,
+    onFeedReset: () -> Unit,
+) {
     val context = LocalContext.current
     var catalogState by remember { mutableStateOf<CatalogState>(CatalogState.Loading) }
     var reloadKey by remember { mutableIntStateOf(0) }
+    /** Set by the retry button: an explicit retry may ignore the on-device cache. */
+    var forceRefresh by remember { mutableStateOf(false) }
+    /** Bumped whenever the feed's inputs change (a reset, or a new spin) so derivations re-run. */
+    var feedVersion by remember { mutableIntStateOf(0) }
+    var resetSignal by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(reloadKey) {
         catalogState = CatalogState.Loading
         catalogState = try {
             val catalog = withContext(Dispatchers.IO) {
-                CatalogService.loadCatalog(context, forceRefresh = reloadKey > 0)
+                CatalogService.loadCatalog(context, forceRefresh = forceRefresh)
             }
             CatalogState.Ready(catalog)
         } catch (t: Throwable) {
@@ -87,14 +100,31 @@ fun AudApp(player: PlaybackManager, store: Store) {
         }
     }
 
+    // A feed reset wipes the learning signal; the Tamil-first feed then re-derives
+    // instantly from the catalog already in memory — no spinner, no re-download.
+    LaunchedEffect(resetSignal) {
+        if (resetSignal == 0) return@LaunchedEffect
+        onFeedReset()
+        feedVersion++
+    }
+
     val playback by player.state.collectAsStateWithLifecycle()
     var likedIds by remember { mutableStateOf(store.likedIds()) }
     var fullPlayerOpen by remember { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(NOW) }
+    var artist by rememberSaveable { mutableStateOf<String?>(null) }
 
-    // Recents are keyed off the current track so the shelf refreshes on every play.
     val currentId = playback.current?.id
-    val recentIds = remember(currentId) { store.recentIds() }
+    val recentIds = remember(currentId, feedVersion) { store.recentIds() }
+    val isFreshProfile = remember(feedVersion) { store.isFreshProfile() }
+
+    // The player records the spin once the stream is live; give it a beat, then re-rank.
+    LaunchedEffect(currentId) {
+        if (currentId != null) {
+            kotlinx.coroutines.delay(700)
+            feedVersion++
+        }
+    }
 
     val onPlay: (List<Track>, Int) -> Unit = remember(player) {
         { queue, index -> player.playQueue(queue, index) }
@@ -106,31 +136,53 @@ fun AudApp(player: PlaybackManager, store: Store) {
     Box(Modifier.fillMaxSize().background(Ink.Background)) {
         when (val state = catalogState) {
             is CatalogState.Loading -> LoadingScreen()
-            is CatalogState.Error -> ErrorScreen(message = state.message, onRetry = { reloadKey++ })
+            is CatalogState.Error -> ErrorScreen(
+                message = state.message,
+                onRetry = {
+                    forceRefresh = true
+                    reloadKey++
+                },
+            )
             is CatalogState.Ready -> {
                 val catalog = state.catalog
-                val forYou = remember(catalog, currentId) {
-                    Personalize.forYou(catalog, store, limit = 18)
+                val forYou = remember(catalog, feedVersion, currentId) {
+                    Personalize.forYou(catalog, store, limit = 24)
+                }
+                val becauseYou = remember(catalog, feedVersion) {
+                    Personalize.becauseYou(catalog, store, limit = 12)
                 }
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f)) {
-                        when (tab) {
-                            NOW -> NowScreen(
+                        val openArtist = artist
+                        when {
+                            openArtist != null -> ArtistScreen(
+                                artist = openArtist,
+                                catalog = catalog,
+                                currentTrackId = currentId,
+                                isPlaying = playback.isPlaying,
+                                onPlay = onPlay,
+                                onBack = { artist = null },
+                                bottomPadding = 0.dp,
+                            )
+                            tab == NOW -> NowScreen(
                                 catalog = catalog,
                                 forYou = forYou,
                                 currentTrackId = currentId,
                                 isPlaying = playback.isPlaying,
+                                isFreshProfile = isFreshProfile,
+                                becauseYou = becauseYou,
                                 onPlay = onPlay,
+                                onOpenArtist = { artist = it },
                                 bottomPadding = 0.dp,
                             )
-                            FIND -> SearchScreen(
+                            tab == FIND -> SearchScreen(
                                 catalog = catalog,
                                 currentTrackId = currentId,
                                 isPlaying = playback.isPlaying,
                                 onPlay = onPlay,
                                 bottomPadding = 0.dp,
                             )
-                            SHELF -> CollectionScreen(
+                            tab == SHELF -> CollectionScreen(
                                 catalog = catalog,
                                 likedIds = likedIds,
                                 recentIds = recentIds,
@@ -139,7 +191,15 @@ fun AudApp(player: PlaybackManager, store: Store) {
                                 onPlay = onPlay,
                                 bottomPadding = 0.dp,
                             )
-                            else -> Unit
+                            tab == SETTINGS -> SettingsScreen(
+                                catalog = catalog,
+                                store = store,
+                                appearance = appearance,
+                                libraryVersion = feedVersion,
+                                onAppearanceChange = onAppearanceChange,
+                                onFeedReset = { resetSignal++ },
+                                bottomPadding = 0.dp,
+                            )
                         }
                     }
                     if (playback.hasTrack) {
@@ -152,7 +212,13 @@ fun AudApp(player: PlaybackManager, store: Store) {
                             onExpand = { fullPlayerOpen = true },
                         )
                     }
-                    BottomBar(active = tab, onSelect = { tab = it })
+                    BottomBar(
+                        active = tab,
+                        onSelect = {
+                            artist = null
+                            tab = it
+                        },
+                    )
                 }
             }
         }
@@ -179,6 +245,10 @@ fun AudApp(player: PlaybackManager, store: Store) {
                     onToggleShuffle = player::toggleShuffle,
                     onToggleRepeat = player::toggleRepeat,
                     onDismiss = { fullPlayerOpen = false },
+                    onOpenArtist = {
+                        fullPlayerOpen = false
+                        artist = current.leadArtist
+                    },
                 )
             }
         }
@@ -188,8 +258,9 @@ fun AudApp(player: PlaybackManager, store: Store) {
 private const val NOW = "now"
 private const val FIND = "find"
 private const val SHELF = "shelf"
+private const val SETTINGS = "settings"
 
-/* ── Mini player — 2dp brass progress hairline on top ── */
+/* ── Mini player — 2dp accent progress hairline on top ── */
 
 @Composable
 private fun MiniPlayer(
@@ -214,7 +285,6 @@ private fun MiniPlayer(
     ) {
         Box {
             Column {
-                // Brass tape-counter line
                 Box(Modifier.fillMaxWidth().height(2.dp).background(Ink.Line)) {
                     Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Ink.Brass))
                 }
@@ -245,7 +315,7 @@ private fun MiniPlayer(
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                         Text(
-                            "${track.shortArtists.uppercase()}  ·  ${if (track.releaseYear > 0) track.releaseYear else track.language.uppercase()}",
+                            "${track.shortArtists.uppercase()}  ·  ${if (track.isTamil) "தமிழ்" else if (track.releaseYear > 0) "${track.releaseYear}" else track.language.uppercase()}",
                             color = Ink.Muted,
                             fontFamily = Mono,
                             fontSize = 7.5.sp,
@@ -300,25 +370,26 @@ private fun MiniPlayer(
     }
 }
 
-/* ── Bottom bar — NOW · FIND · SHELF with brass tick ── */
+/* ── Bottom bar — NOW · FIND · SHELF · YOU with an accent tick ── */
 
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
     Surface(color = Ink.Paper, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
-        Hairline()
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BottomItem(NOW, "NOW", Icons.Rounded.Radio, active, onSelect)
-            BottomItem(FIND, "FIND", Icons.Rounded.Search, active, onSelect)
-            BottomItem(SHELF, "SHELF", Icons.Rounded.LibraryMusic, active, onSelect)
-        }
+            Hairline()
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BottomItem(NOW, "NOW", Icons.Rounded.Radio, active, onSelect)
+                BottomItem(FIND, "FIND", Icons.Rounded.Search, active, onSelect)
+                BottomItem(SHELF, "SHELF", Icons.Rounded.LibraryMusic, active, onSelect)
+                BottomItem(SETTINGS, "YOU", Icons.Rounded.Settings, active, onSelect)
+            }
         }
     }
 }
@@ -337,12 +408,12 @@ private fun BottomItem(
     Column(
         Modifier
             .clickable { onSelect(tab) }
-            .padding(horizontal = 18.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(23.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, color = tint, fontFamily = Mono, fontSize = 8.sp, letterSpacing = 1.9.sp)
+        Text(label, color = tint, fontFamily = Mono, fontSize = 8.sp, letterSpacing = 1.7.sp)
         Spacer(Modifier.height(3.dp))
         Box(
             Modifier
@@ -380,7 +451,7 @@ private fun LoadingScreen() {
             VuBars(active = true, modifier = Modifier.height(20.dp))
             Spacer(Modifier.height(14.dp))
             Text(
-                "TUNING THE WIRE — LIVE CATALOG",
+                "TUNING THE WIRE — TAMIL FIRST",
                 color = Ink.Muted,
                 fontFamily = Mono,
                 fontSize = 8.5.sp,
@@ -415,7 +486,7 @@ private fun ErrorScreen(message: String, onRetry: () -> Unit) {
                 "Can't reach the wire.",
                 color = Ink.Parchment,
                 fontFamily = Serif,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                fontStyle = FontStyle.Italic,
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
             )
@@ -460,4 +531,3 @@ private fun ErrorScreen(message: String, onRetry: () -> Unit) {
         }
     }
 }
-

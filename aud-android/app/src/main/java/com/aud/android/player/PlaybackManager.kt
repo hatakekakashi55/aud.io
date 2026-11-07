@@ -119,8 +119,6 @@ class PlaybackManager(private val store: Store) {
         val track = _state.value.queue.getOrNull(index) ?: return
         stopTicker()
         playerRef.getAndSet(null)?.let { runCatching { it.release() } }
-        store.pushRecent(track.id)
-        store.recordPlay(track)
 
         _state.update {
             it.copy(isPreparing = true, isPlaying = false, positionSec = 0, durationSec = track.durationSec)
@@ -131,6 +129,10 @@ class PlaybackManager(private val store: Store) {
             setDataSource(track.audioUrl)
             setOnPreparedListener { mp ->
                 consecutiveLoadFailures = 0
+                // Count the spin only once the stream is genuinely live — a dead URL
+                // that we auto-skip must not poison the personalization signal.
+                store.pushRecent(track.id)
+                store.recordPlay(track)
                 mp.start()
                 _state.update {
                     it.copy(
