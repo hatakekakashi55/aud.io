@@ -28,15 +28,29 @@ Tamil rows are detected by the service's `language` field **plus** Tamil-script
 sniffing on title/artist/album, so blank or mis-tagged rows still land on the
 right shelf. Language-filtering means the Tamil shelves stay Tamil.
 
-### Home page (NOW)
+### Home page — dashboard layout (v1.2.0)
 
-Masthead (with live Tamil share %) → *Play for You* hero → **For You** rail →
-*Because you played …* (once there is history) →
-**Fresh Tamil** → **Tamil artists** circles (tap → artist page) → *Love, in Tamil*
-→ *Kuthu & mass* → *Evergreen Tamil gold* → *Beyond the big two* → *Voices* →
-*Tamil indie & rap* → *Bhakti & folk* → *Across India* → *Around the world* →
-the chart → colophon. Roughly 12 rails, so there is always another shelf below
-the fold instead of the same twelve songs.
+Laid out like a modern streaming dashboard, painted in AUD's muted palette
+(design reference: *SonicWave* — structure only, **no neon**):
+
+| Block | What it is |
+| --- | --- |
+| **Masthead** | dusk gradient, `Good Evening, <name> ♪`, bell + avatar (name editable in *Profile*) |
+| **Search pill** | rounded pill → opens *Explore* |
+| **Your Sound Universe** | 6 mood tiles — Chill · Romance · Heartbreak · Workout · Focus · Travel. Each is a **live Tamil-first seed query**, tapping opens a real mood page |
+| **Continue Listening** | last spin, transport, muted progress bar, kebab |
+| **Made For Your Taste** | cover-flow cards: Daily Mix (stable per day), Tamil Vibes, Mood Booster, Chill Hits, Throwback Tamil, New Voices |
+| **Trending Now** | chart rows with heart + kebab |
+| **Because you played …** | artist rail, only once real history exists |
+| **Voices / deeper shelves** | artist circles + the Tamil editorial shelves below the fold |
+
+Bottom nav is now five tabs: **Home · Explore · Library · Playlists · Profile**
+(Playlists = every editorial mix, Tamil tapes first). A floating mini player sits
+above the nav with chevron, artwork, prev/play/next and a slim progress line.
+
+> A static HTML **design preview** of this screen (same layout, same tokens) lives in
+> [`../preview-home/index.html`](../preview-home/index.html) — `python3 -m http.server`
+> inside that folder and open it in a browser. It is a design mock, not the app.
 
 ## Personalized feed — "For You", and resetting it
 
@@ -53,7 +67,7 @@ actually live (a dead URL that auto-skips does not count):
   not jitter while you scroll;
 - the hero card (*Play for You*) starts that queue in one tap.
 
-### Reset the feed — `Settings → Your feed → Reset my feed`
+### Reset the feed — `Profile → Your feed → Reset my feed`
 
 One tap opens a confirm step, then `Store.resetFeed()` wipes **only** the learning
 signal (play counts, artist affinity, language affinity) and forces a fresh live
@@ -79,20 +93,20 @@ The editorial language stays — serif display headlines, monospace metadata, nu
 liner-notes index, a Canvas-drawn tape-waveform seek bar, a mini player with a 2dp
 accent progress hairline and full transport detail.
 
-**Settings → Look & feel** (4th tab, *YOU*):
+**Profile → Look & feel** (5th tab):
 - **accent** — Sea glass (default), Sage, Periwinkle, Warm sand, Dusty rose;
 - **text size** — S / M / L / XL, multiplied onto the system font scale;
 - **high-contrast text** — brighter body copy if the default reads too soft.
 
 All of it is observable state on `Ink`, so a change repaints the app instantly.
-Bottom nav: **NOW · FIND · SHELF · YOU**.
+Bottom nav: **Home · Explore · Library · Playlists · Profile**.
 
-- **NOW** — masthead greeting (time-aware), Play-for-You hero, For You rail,
-  Fresh Tamil, artist circles and ~10 editorial shelves, then the chart.
-- **FIND** — instant local matches + a live "From the Wire" section (debounced,
-  Tamil-first quick searches).
-- **SHELF** — your likes + recently spun, stored on this device.
-- **YOU** — feed reset, taste summary, accent / text size / contrast.
+- **Home** — the dashboard above.
+- **Explore** — instant local matches + a live "From the Wire" section, with mood
+  shortcuts and Tamil-first quick searches.
+- **Library** — your likes + recently spun, stored on this device.
+- **Playlists** — every editorial mix as a browsable index, Tamil tapes first.
+- **Profile** — your name, feed reset, taste summary, accent / text size / contrast.
 
 Tapping an artist anywhere (home circles, the player's artist line) opens an
 **artist page**: local tracks immediately, then a live "more from …" fetch that
@@ -168,6 +182,19 @@ aud-android/
     ui/FullPlayer.kt           # the "listening card" (slides up)
     ui/AudApp.kt               # scaffold: NOW/FIND/SHELF/YOU, mini player, states
 ```
+
+## v1.2.0 — dashboard home page
+
+- Home rebuilt as a streaming dashboard: masthead + search pill, **6 mood tiles**
+  (live Tamil-first queries, each opens a mood page), **Continue Listening**,
+  **Made For Your Taste** cover-flow, **Trending Now**, artist rail, deeper shelves.
+- Catalog grew to **60 buckets** (54 + 6 moods) with `moods` and `tasteMixes`
+  persisted in the v4 cache; Daily Mix rotates once per day, deterministically.
+- Five-tab nav (**Home / Explore / Library / Playlists / Profile**), new
+  **Playlists** screen, floating mini player with expand chevron + prev/play/next.
+- New components: `HomeSearchPill`, `MoodTile`, `ContinueListeningCard`,
+  `TasteMixCard`, `TrendingRow`, `HomeSectionTitle` — all muted, low-glare tints.
+- Name in the masthead is editable in Profile (`Store.displayName`).
 
 ## v1.1.0 — what changed
 

@@ -17,6 +17,19 @@ class Store(context: Context) {
 
     private val prefs = context.applicationContext.getSharedPreferences("aud_prefs", Context.MODE_PRIVATE)
 
+    /* ── Profile ── */
+
+    /**
+     * A display name for the masthead. Android has no "account" here, so this is
+     * whatever the listener typed in Settings — "Listener" until they do.
+     */
+    fun displayName(): String =
+        prefs.getString(KEY_DISPLAY_NAME, "").orEmpty().trim().ifBlank { "Listener" }
+
+    fun setDisplayName(name: String) {
+        prefs.edit().putString(KEY_DISPLAY_NAME, name.trim().take(24)).apply()
+    }
+
     fun likedIds(): Set<String> = prefs.getStringSet(KEY_LIKED, emptySet())?.toSet() ?: emptySet()
 
     /** Returns the new liked state of [trackId]. */
@@ -120,5 +133,6 @@ class Store(context: Context) {
         private const val KEY_ARTIST_COUNTS = "artist_counts_v1"
         private const val KEY_LANGUAGE_COUNTS = "language_counts_v1"
         private const val KEY_LAST_RESET = "feed_reset_at"
+        private const val KEY_DISPLAY_NAME = "display_name"
     }
 }

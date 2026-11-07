@@ -22,9 +22,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.AirplanemodeActive
+import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.SelfImprovement
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Settings as SettingsIcon
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,24 +40,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aud.android.data.Catalog
+import com.aud.android.data.Mood
+import com.aud.android.data.TasteMix
 import com.aud.android.data.Track
-import java.text.SimpleDateFormat
+import com.aud.android.data.greetingFor
 import java.util.Calendar
-import java.util.Locale
 
 /**
- * The front page — a Tamil-first listening room with many rails, so there is
- * always another shelf below the fold instead of the same handful of songs.
+ * Home — laid out like a modern streaming dashboard, painted in AUD's muted,
+ * low-glare palette instead of the reference's neon.
  *
- * Order is deliberate: personalized For You → fresh Tamil → Tamil artists →
- * the Tamil shelves (romance, energy, canon, composers, voices, indie, roots) →
- * the rest of India → the world → the chart.
+ *   masthead (greeting + bell + avatar)
+ *   search pill
+ *   Your Sound Universe      — six muted mood tiles (live Tamil-first queries)
+ *   Continue Listening       — last spin, transport, progress, kebab
+ *   Made For Your Taste      — cover-flow mix cards
+ *   Trending Now             — chart rows with heart + kebab
+ *   Because you played …     — artist rail (once there is history)
+ *   the deeper Tamil shelves — the long tail from v1.1.0, kept below the fold
  */
 @Composable
 fun NowScreen(
@@ -60,299 +74,417 @@ fun NowScreen(
     isPlaying: Boolean,
     isFreshProfile: Boolean,
     becauseYou: Pair<String, List<Track>>?,
+    progressFraction: Float,
+    displayName: String,
+    likedIds: Set<String>,
     onPlay: (List<Track>, Int) -> Unit,
+    onPlayPause: () -> Unit,
     onOpenArtist: (String) -> Unit,
+    onOpenMood: (Mood) -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onToggleLike: (String) -> Unit,
+    onOpenTrack: (Track) -> Unit,
     bottomPadding: Dp,
 ) {
-    val now = remember { Calendar.getInstance() }
-    val hour = now.get(Calendar.HOUR_OF_DAY)
-    val greeting = when (hour) {
-        in 5..11 -> "GOOD MORNING"
-        in 12..16 -> "GOOD AFTERNOON"
-        in 17..21 -> "GOOD EVENING"
-        else -> "UP LATE"
-    }
-    val dateLine = remember {
-        SimpleDateFormat("EEEE, d MMMM", Locale.ENGLISH).format(Calendar.getInstance().time)
-            .uppercase(Locale.ENGLISH)
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val greeting = remember(hour) { greetingFor(hour) }
+    val firstName = remember(displayName) {
+        displayName.trim().split(" ").firstOrNull()?.ifBlank { null } ?: "there"
     }
 
-    val shelves = remember(catalog) { catalog.shelves }
-    val chartShelf = remember(shelves) { shelves.firstOrNull { it.key == "charts" } }
-    val bodyShelves = remember(shelves) { shelves.filterNot { it.key == "charts" } }
+    val moods = remember(catalog) { catalog.moodList }
+    val tasteMixes = remember(catalog, becauseYou) { catalog.tasteMixes }
+    val trending = remember(catalog) {
+        catalog.shelves.firstOrNull { it.key == "charts" }?.tracks.orEmpty().take(8)
+    }
+    val current = remember(forYou, currentTrackId) {
+        forYou.firstOrNull { it.id == currentTrackId } ?: forYou.firstOrNull()
+    }
     val heroQueue = forYou.ifEmpty { catalog.tamilTracks.ifEmpty { catalog.tracks } }
-    val tamilShare = remember(catalog) { (catalog.tamilShare * 100).toInt() }
-    val topArtists = remember(catalog) {
+    val artistRail = remember(catalog) {
         catalog.tamilTracks.ifEmpty { catalog.tracks }
             .groupBy { it.leadArtist }
-            .mapValues { (_, rows) -> rows }
             .entries
             .sortedByDescending { it.value.size }
             .take(14)
-            .map { entry -> entry.key to entry.value.first().imageUrl }
+            .map { it.key to it.value.first().imageUrl }
+    }
+    val deeperShelves = remember(catalog) {
+        catalog.shelves.filter { it.key != "charts" }.take(6)
     }
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = bottomPadding + 20.dp),
+        contentPadding = PaddingValues(bottom = bottomPadding + 22.dp),
     ) {
-        /* ── Masthead ── */
+        /* ── Masthead — dusk gradient, greeting, bell, avatar ── */
         item(key = "masthead") {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "$greeting — THE LISTENING POST",
-                        color = Ink.Brass,
-                        fontFamily = Mono,
-                        fontSize = 9.sp,
-                        letterSpacing = 2.sp,
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Ink.HeroTop, Ink.HeroMid, Ink.Background)
+                        )
                     )
-                    Spacer(Modifier.weight(1f))
-                    LivePill()
+                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 18.dp),
+            ) {
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(Ink.Brass.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Headphones,
+                                contentDescription = null,
+                                tint = Ink.Brass,
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(9.dp))
+                        Text(
+                            "AUD",
+                            color = Ink.Parchment,
+                            fontFamily = Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 21.sp,
+                            letterSpacing = 0.5.sp,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Ink.Line, CircleShape)
+                                .clickable(onClick = onOpenSettings),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Notifications,
+                                contentDescription = "What's new",
+                                tint = Ink.Muted,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Ink.Raised)
+                                .border(1.dp, Ink.Line, CircleShape)
+                                .clickable(onClick = onOpenSettings),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                firstName.firstOrNull()?.uppercaseChar()?.toString() ?: "A",
+                                color = Ink.Brass,
+                                fontFamily = Serif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(26.dp))
+                    Text(
+                        "$greeting,",
+                        color = Ink.Muted,
+                        fontFamily = Sans,
+                        fontSize = 17.sp,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        firstName,
+                        color = Ink.Parchment,
+                        fontFamily = Sans,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 31.sp,
+                        letterSpacing = (-0.6).sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (isFreshProfile) "Let's find your next favourite song…"
+                        else "Tamil first — and everything you keep coming back to.",
+                        color = Ink.Muted,
+                        fontFamily = Sans,
+                        fontSize = 13.sp,
+                    )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(dateLine, color = Ink.Faint, fontFamily = Mono, fontSize = 9.sp, letterSpacing = 1.4.sp)
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Tamil first,",
-                    color = Ink.Parchment,
-                    fontFamily = Serif,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 36.sp,
-                    lineHeight = 42.sp,
-                )
-                Text(
-                    "then the whole world.",
-                    color = Ink.Brass,
-                    fontFamily = Serif,
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
-                    lineHeight = 42.sp,
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "$tamilShare% TAMIL · ${catalog.tracks.size} LIVE TRACKS · ${catalog.shelves.size} SHELVES",
-                    color = Ink.Muted,
-                    fontFamily = Mono,
-                    fontSize = 8.5.sp,
-                    letterSpacing = 1.4.sp,
-                )
             }
         }
 
-        item(key = "rule1") { Hairline(Modifier.padding(horizontal = 20.dp)) }
+        /* ── Search pill ── */
+        item(key = "search") {
+            Box(Modifier.padding(horizontal = 20.dp)) {
+                HomeSearchPill(hint = "Search songs, albums, artists…", onClick = onOpenSearch)
+            }
+            Spacer(Modifier.height(22.dp))
+        }
 
-        /* ── Hero — the personalized queue, one tap away ── */
-        item(key = "hero") {
-            Box(
-                Modifier
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
-                    .fillMaxWidth()
-                    .height(178.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF1C3B37), Color(0xFF17211F))))
-                    .border(1.dp, Ink.Brass.copy(alpha = 0.32f), RoundedCornerShape(20.dp))
-                    .clickable { onPlay(heroQueue, 0) }
-                    .padding(20.dp),
-            ) {
-                Column(Modifier.fillMaxWidth()) {
-                    Text(
-                        if (isFreshProfile) "SIDE A — TAMIL, TO START YOU OFF" else "SIDE A — MADE FOR YOU",
-                        color = Ink.Brass,
-                        fontFamily = Mono,
-                        fontSize = 8.5.sp,
-                        letterSpacing = 1.8.sp,
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        "The Tonight Tape",
-                        color = Ink.Parchment,
-                        fontFamily = Serif,
-                        fontStyle = FontStyle.Italic,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 27.sp,
-                    )
-                    Text(
-                        if (isFreshProfile) "${heroQueue.size} TRACKS · TAMIL-FIRST, RESET ANYTIME"
-                        else "${heroQueue.size} TRACKS, TUNED TO YOUR SPINS",
-                        color = Ink.Muted,
-                        fontFamily = Mono,
-                        fontSize = 8.5.sp,
-                        letterSpacing = 1.2.sp,
-                    )
-                }
-                Surface(
-                    color = Ink.Brass,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .clickable { onPlay(heroQueue, 0) },
+        /* ── Your Sound Universe — mood tiles ── */
+        if (moods.isNotEmpty()) {
+            item(key = "moods-header") {
+                HomeSectionTitle(
+                    title = "Your Sound Universe",
+                    actionLabel = "Explore moods",
+                    onAction = onOpenSearch,
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            item(key = "moods-rail") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        Modifier.padding(start = 14.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = Ink.OnBrass,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "PLAY",
-                            color = Ink.OnBrass,
-                            fontFamily = Mono,
-                            fontSize = 9.sp,
-                            letterSpacing = 1.6.sp,
+                    items(moods, key = { "mood-${it.key}" }) { mood ->
+                        MoodTile(
+                            label = mood.label,
+                            icon = moodIcon(mood.key),
+                            gradient = moodGradient(mood.key),
+                            onClick = { onOpenMood(mood) },
                         )
                     }
                 }
+                Spacer(Modifier.height(24.dp))
             }
         }
 
-        /* ── For You ── */
-        item(key = "foryou-header") {
-            SectionHeader(
-                kicker = "For you",
-                title = if (isFreshProfile) "Start here — Tamil first" else "Tuned by your spins",
-                subtitle = if (isFreshProfile) "No history yet, so this is the Tamil-first mix. Reset it anytime in Settings."
-                else "Ranked on this device from what you actually play.",
-            )
-            Spacer(Modifier.height(10.dp))
-        }
-        item(key = "foryou-rail") {
-            TrackRail(tracks = forYou, onPlay = onPlay, keyPrefix = "foryou")
-            Spacer(Modifier.height(20.dp))
+        /* ── Continue Listening ── */
+        if (current != null) {
+            item(key = "continue-header") {
+                HomeSectionTitle(
+                    title = "Continue Listening",
+                    actionLabel = "See all",
+                    onAction = { onPlay(heroQueue, 0) },
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+            item(key = "continue-card") {
+                Box(Modifier.padding(horizontal = 20.dp)) {
+                    ContinueListeningCard(
+                        track = current,
+                        fraction = if (current.id == currentTrackId) progressFraction else 0f,
+                        isPlaying = isPlaying && current.id == currentTrackId,
+                        onPlayPause = {
+                            if (current.id == currentTrackId) onPlayPause()
+                            else onPlay(heroQueue, heroQueue.indexOf(current).coerceAtLeast(0))
+                        },
+                        onOpen = {
+                            if (current.id == currentTrackId) onPlayPause()
+                            else onPlay(heroQueue, heroQueue.indexOf(current).coerceAtLeast(0))
+                        },
+                        onMenu = { onOpenTrack(current) },
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
         }
 
-        /* ── Because you played … — only once there is real history ── */
+        /* ── Made For Your Taste ── */
+        if (tasteMixes.isNotEmpty()) {
+            item(key = "taste-header") {
+                HomeSectionTitle(
+                    title = "Made For Your Taste",
+                    subtitle = if (isFreshProfile) "Built from the Tamil-first catalogue"
+                    else "Sharpened by what you actually play",
+                    actionLabel = "See all",
+                    onAction = { onPlay(tasteMixes.first().tracks, 0) },
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            item(key = "taste-rail") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    itemsIndexed(tasteMixes, key = { _, m -> "taste-${m.key}" }) { _, mix: TasteMix ->
+                        TasteMixCard(
+                            title = mix.title,
+                            subtitle = mix.subtitle,
+                            track = mix.tracks.firstOrNull(),
+                            accentIndex = mix.accentIndex,
+                            onPlay = { onPlay(mix.tracks, 0) },
+                            onClick = { onPlay(mix.tracks, 0) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+
+        /* ── Trending Now ── */
+        if (trending.isNotEmpty()) {
+            item(key = "trending-header") {
+                HomeSectionTitle(
+                    title = "Trending Now",
+                    subtitle = "Hot tracks this week",
+                    actionLabel = "See all",
+                    onAction = { onPlay(trending, 0) },
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            itemsIndexed(trending, key = { _, t -> "trend-${t.id}" }) { index, track ->
+                Box(Modifier.padding(horizontal = 12.dp)) {
+                    TrendingRow(
+                        track = track,
+                        liked = track.id in likedIds,
+                        isCurrent = track.id == currentTrackId,
+                        isPlaying = isPlaying,
+                        onClick = { onPlay(trending, index) },
+                        onToggleLike = { onToggleLike(track.id) },
+                        onMenu = { onOpenTrack(track) },
+                    )
+                }
+            }
+            item(key = "trending-tail") { Spacer(Modifier.height(18.dp)) }
+        }
+
+        /* ── Because you played … ── */
         if (becauseYou != null) {
             item(key = "because-header") {
                 Hairline(Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(14.dp))
-                SectionHeader(
-                    kicker = "Because you played",
-                    title = becauseYou.first,
-                    subtitle = "More from the artist you keep coming back to.",
+                Spacer(Modifier.height(16.dp))
+                HomeSectionTitle(
+                    title = "Because you played ${becauseYou.first}",
+                    subtitle = "More from the artist you keep returning to",
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
             }
             item(key = "because-rail") {
                 TrackRail(
                     tracks = becauseYou.second,
                     onPlay = onPlay,
                     keyPrefix = "because",
-                    cardSize = 128.dp,
+                    cardSize = 124.dp,
                 )
-                Spacer(Modifier.height(20.dp))
-            }
-        }
-
-        /* ── Fresh Tamil — horizontal square rail ── */
-        val fresh = bodyShelves.firstOrNull { it.key == "tamil_fresh" }
-        if (fresh != null) {
-            item(key = "fresh-header") {
-                Hairline(Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(14.dp))
-                SectionHeader(kicker = fresh.kicker, title = fresh.title, subtitle = fresh.subtitle)
-                Spacer(Modifier.height(10.dp))
-            }
-            item(key = "fresh-rail") {
-                TrackRail(tracks = fresh.tracks, onPlay = onPlay, keyPrefix = "fresh", badgeFor = { "NEW" })
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(22.dp))
             }
         }
 
         /* ── Tamil artists ── */
-        if (topArtists.isNotEmpty()) {
+        if (artistRail.isNotEmpty()) {
             item(key = "artists-header") {
                 Hairline(Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(14.dp))
-                SectionHeader(kicker = "Tamil · people", title = "The faces behind the songs")
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
+                HomeSectionTitle(title = "The voices behind it", actionLabel = "All artists")
+                Spacer(Modifier.height(12.dp))
             }
             item(key = "artists-rail") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(topArtists, key = { "artist-${it.first}" }) { (name, image) ->
+                    items(artistRail, key = { "artist-${it.first}" }) { (name, image) ->
                         ArtistCircle(name = name, imageUrl = image, onClick = { onOpenArtist(name) })
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(22.dp))
             }
         }
 
-        /* ── Every other shelf, Tamil first, then India, then the world ── */
-        bodyShelves.filterNot { it.key == "tamil_fresh" }.forEach { shelf ->
+        /* ── The long tail — v1.1.0's editorial shelves, still below the fold ── */
+        deeperShelves.forEach { shelf ->
             item(key = "shelf-header-${shelf.key}") {
                 Hairline(Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(14.dp))
-                SectionHeader(kicker = shelf.kicker, title = shelf.title, subtitle = shelf.subtitle)
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
+                HomeSectionTitle(
+                    title = shelf.title,
+                    subtitle = shelf.subtitle,
+                    actionLabel = "See all",
+                    onAction = { onPlay(shelf.tracks, 0) },
+                )
+                Spacer(Modifier.height(12.dp))
             }
             item(key = "shelf-rail-${shelf.key}") {
                 TrackRail(
                     tracks = shelf.tracks,
                     onPlay = onPlay,
                     keyPrefix = "shelf-${shelf.key}",
+                    cardSize = 132.dp,
                 )
-                Spacer(Modifier.height(20.dp))
-            }
-        }
-
-        /* ── The chart ── */
-        if (chartShelf != null && chartShelf.tracks.isNotEmpty()) {
-            item(key = "chart-header") {
-                Hairline(Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(14.dp))
-                SectionHeader(
-                    kicker = chartShelf.kicker,
-                    title = chartShelf.title,
-                    subtitle = chartShelf.subtitle,
-                )
-                Spacer(Modifier.height(6.dp))
-            }
-            itemsIndexed(chartShelf.tracks, key = { _, t -> "chart-${t.id}" }) { index, track ->
-                LinerRow(
-                    index = index,
-                    track = track,
-                    isCurrent = track.id == currentTrackId,
-                    isPlaying = isPlaying,
-                    onClick = { onPlay(chartShelf.tracks, index) },
-                )
+                Spacer(Modifier.height(22.dp))
             }
         }
 
         /* ── Colophon ── */
         item(key = "colophon") {
-            Column(Modifier.padding(top = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Hairline(Modifier.padding(horizontal = 60.dp))
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 Text(
-                    "AUD · THE LISTENING POST",
+                    "AUD · TAMIL FIRST · ${catalog.tracks.size} LIVE TRACKS",
                     color = Ink.Faint,
                     fontFamily = Mono,
-                    fontSize = 8.sp,
-                    letterSpacing = 2.2.sp,
+                    fontSize = 7.5.sp,
+                    letterSpacing = 1.6.sp,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "EVERY TRACK STREAMS LIVE — NOTHING PRE-DOWNLOADED",
-                    color = Ink.Faint,
-                    fontFamily = Mono,
-                    fontSize = 7.sp,
-                    letterSpacing = 1.3.sp,
-                )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .border(1.dp, Ink.Line, RoundedCornerShape(50))
+                        .clickable(onClick = onOpenSettings)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        SettingsIcon,
+                        contentDescription = null,
+                        tint = Ink.Muted,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "TUNE YOUR FEED",
+                        color = Ink.Muted,
+                        fontFamily = Mono,
+                        fontSize = 8.sp,
+                        letterSpacing = 1.4.sp,
+                    )
+                }
             }
         }
     }
 }
 
-/** One horizontal rail of square cards — the home page's building block. */
+/* ── Mood tile icon + muted gradient per key ── */
+
+private fun moodIcon(key: String): ImageVector = when (key) {
+    "chill" -> Icons.Rounded.Headphones
+    "romance" -> Icons.Rounded.FavoriteBorder
+    "heartbreak" -> Icons.Rounded.Cloud
+    "workout" -> Icons.Rounded.FitnessCenter
+    "focus" -> Icons.Rounded.CenterFocusStrong
+    "travel" -> Icons.Rounded.AirplanemodeActive
+    else -> Icons.Rounded.SelfImprovement
+}
+
+private fun moodGradient(key: String): List<Color> = when (key) {
+    "chill" -> Ink.TileChill
+    "romance" -> Ink.TileRomance
+    "heartbreak" -> Ink.TileHeartbreak
+    "workout" -> Ink.TileWorkout
+    "focus" -> Ink.TileFocus
+    "travel" -> Ink.TileTravel
+    else -> Ink.TileChill
+}
+
+/* ── Horizontal rail of square artwork cards (shared with the shelves) ── */
+
 @Composable
 fun TrackRail(
     tracks: List<Track>,

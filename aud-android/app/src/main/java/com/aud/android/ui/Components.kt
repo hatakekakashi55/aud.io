@@ -22,6 +22,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -421,5 +429,446 @@ fun TapeCard(
                 }
             }
         }
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * Home-page vocabulary — the SonicWave-style layout, in muted colours.
+ * Reference: search pill, 6 mood tiles, continue-listening card,
+ * taste-mix cover-flow, trending rows, float mini player, 5-tab nav.
+ * ══════════════════════════════════════════════════════════════════ */
+
+/** The rounded search pill at the top of the page. Tapping opens FIND. */
+@Composable
+fun HomeSearchPill(
+    hint: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Ink.Paper)
+            .border(1.dp, Ink.Line, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(start = 16.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Rounded.Search,
+            contentDescription = "Search",
+            tint = Ink.Muted,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            hint,
+            color = Ink.Faint,
+            fontFamily = Sans,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Ink.Brass),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = Ink.OnBrass,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/** One mood tile in "Your Sound Universe" — muted gradient, icon + label. */
+@Composable
+fun MoodTile(
+    label: String,
+    icon: ImageVector,
+    gradient: List<Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .width(96.dp)
+            .height(100.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(gradient))
+            .border(1.dp, Ink.Line, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(Ink.Parchment.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Ink.Parchment.copy(alpha = 0.92f),
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Text(
+            label,
+            color = Ink.Parchment,
+            fontFamily = Sans,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Section title in the reference's voice: bold sans + optional "See all ›". */
+@Composable
+fun HomeSectionTitle(
+    title: String,
+    subtitle: String? = null,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                color = Ink.Parchment,
+                fontFamily = Sans,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp,
+                letterSpacing = (-0.2).sp,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    subtitle,
+                    color = Ink.Muted,
+                    fontFamily = Sans,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (actionLabel != null && onAction != null) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable(onClick = onAction)
+                    .padding(start = 8.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    actionLabel,
+                    color = Ink.Muted,
+                    fontFamily = Sans,
+                    fontSize = 11.5.sp,
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = Ink.Muted,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Continue Listening" — the wide card with artwork, transport, progress and a
+ * kebab. Progress is a smooth muted bar (the reference's neon line, calmed).
+ */
+@Composable
+fun ContinueListeningCard(
+    track: Track,
+    fraction: Float,
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
+    onOpen: () -> Unit,
+    onMenu: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Ink.Paper)
+            .border(1.dp, Ink.Line, RoundedCornerShape(18.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(74.dp)
+                .clickable(onClick = onOpen),
+        ) {
+            Artwork(track.imageUrl, track.title, Modifier.size(74.dp), corner = 14.dp, decodeSize = 200)
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Ink.OnBrass.copy(alpha = 0.82f))
+                    .clickable(onClick = onPlayPause),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = Ink.Brass,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                color = Ink.Parchment,
+                fontFamily = Sans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                track.shortArtists,
+                color = Ink.Muted,
+                fontFamily = Sans,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(10.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Ink.Line),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Ink.Brass),
+                )
+            }
+        }
+        Icon(
+            Icons.Rounded.MoreVert,
+            contentDescription = "More",
+            tint = Ink.Muted,
+            modifier = Modifier
+                .size(38.dp)
+                .clickable(onClick = onMenu)
+                .padding(9.dp),
+        )
+    }
+}
+
+private val TASTE_GRADIENTS: List<List<Color>> = listOf(
+    listOf(Color(0xFF2C3B45), Color(0xFF1C272E)),
+    listOf(Color(0xFF3C3226), Color(0xFF272016)),
+    listOf(Color(0xFF33283C), Color(0xFF221B29)),
+    listOf(Color(0xFF283A34), Color(0xFF1B2723)),
+    listOf(Color(0xFF38312C), Color(0xFF241F1C)),
+    listOf(Color(0xFF2A303C), Color(0xFF1D2129)),
+)
+
+/**
+ * "Made For Your Taste" card — a portrait cover built from a muted gradient +
+ * real artwork of the first track, with a play affordance in the corner.
+ */
+@Composable
+fun TasteMixCard(
+    title: String,
+    subtitle: String,
+    track: Track?,
+    accentIndex: Int,
+    onPlay: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val gradient = TASTE_GRADIENTS[Math.floorMod(accentIndex, TASTE_GRADIENTS.size)]
+    Column(
+        modifier
+            .width(148.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(148.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(gradient))
+                .border(1.dp, Ink.Line, RoundedCornerShape(18.dp)),
+        ) {
+            if (track?.imageUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(track.imageUrl)
+                        .size(320)
+                        .crossfade(120)
+                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alpha = 0.55f,
+                    modifier = Modifier.fillMaxWidth().height(148.dp),
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(148.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Ink.Background.copy(alpha = 0.55f))
+                            )
+                        ),
+                )
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Ink.Parchment.copy(alpha = 0.14f))
+                    .border(1.dp, Ink.Parchment.copy(alpha = 0.22f), CircleShape)
+                    .clickable(onClick = onPlay),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.PlayArrow,
+                    contentDescription = "Play $title",
+                    tint = Ink.Parchment,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            title,
+            color = Ink.Parchment,
+            fontFamily = Sans,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(1.dp))
+        Text(
+            subtitle,
+            color = Ink.Muted,
+            fontFamily = Sans,
+            fontSize = 10.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** A "Trending Now" row: artwork, title, artist, heart, kebab. */
+@Composable
+fun TrendingRow(
+    track: Track,
+    liked: Boolean,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    onToggleLike: () -> Unit,
+    onMenu: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            Artwork(track.imageUrl, track.title, Modifier.size(54.dp), corner = 12.dp, decodeSize = 200)
+            if (isCurrent) {
+                Box(
+                    Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Ink.Background.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VuBars(active = isPlaying)
+                }
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                color = if (isCurrent) Ink.Brass else Ink.Parchment,
+                fontFamily = Sans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                track.shortArtists,
+                color = Ink.Muted,
+                fontFamily = Sans,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            contentDescription = if (liked) "Unlike" else "Like",
+            tint = if (liked) Ink.Brass else Ink.Muted.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(38.dp)
+                .clickable(onClick = onToggleLike)
+                .padding(9.dp),
+        )
+        Icon(
+            Icons.Rounded.MoreVert,
+            contentDescription = "More",
+            tint = Ink.Muted.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(34.dp)
+                .clickable(onClick = onMenu)
+                .padding(7.dp),
+        )
     }
 }

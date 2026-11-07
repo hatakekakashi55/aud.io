@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.aud.android.data.CatalogService
 import com.aud.android.data.Catalog
@@ -52,6 +53,12 @@ private val QUICK = listOf(
     "Anirudh", "A. R. Rahman", "Ilaiyaraaja", "Sid Sriram",
     "Kuthu", "Tamil Love", "Tamil Sad", "Harris Jayaraj",
     "Yuvan", "Tamil Rap", "Bollywood", "Tamil Indie",
+)
+
+/** Shortcut chips shown as a wrapped grid — Tamil-heavy on purpose. */
+private val EXPLORE_CHIPS = listOf(
+    "Tamil Chill", "Tamil Romance", "Tamil Workout", "Tamil Focus",
+    "Tamil Travel", "Tamil Heartbreak", "Tamil Melody", "Tamil Mass",
 )
 
 /** The archive — instant local matches, plus a live "From the Wire" search. */
@@ -97,8 +104,25 @@ fun SearchScreen(
     ) {
         /* Heading */
         item(key = "heading") {
-            Spacer(Modifier.height(16.dp))
-            SectionHeader(kicker = "The Archive", title = "What shall we play?")
+            Spacer(Modifier.height(18.dp))
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Text(
+                    "Explore",
+                    color = Ink.Parchment,
+                    fontFamily = Sans,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 27.sp,
+                    letterSpacing = (-0.6).sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Search the stack and the live wire — Tamil first.",
+                    color = Ink.Muted,
+                    fontFamily = Sans,
+                    fontSize = 12.5.sp,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
         }
 
         /* Underline search field */
@@ -154,7 +178,16 @@ fun SearchScreen(
                     subtitle = "Tamil first — the rest of the map underneath.",
                 )
             }
+            item(key = "mood-chips") {
+                Spacer(Modifier.height(4.dp))
+                HomeSectionTitle(title = "Moods to start from")
+                Spacer(Modifier.height(10.dp))
+                FlowChips(values = EXPLORE_CHIPS, onPick = { query = it })
+                Spacer(Modifier.height(18.dp))
+            }
             item(key = "quick-chips") {
+                HomeSectionTitle(title = "Shortcuts")
+                Spacer(Modifier.height(10.dp))
                 FlowChips(values = QUICK, onPick = { query = it })
             }
             item(key = "quick-note") {

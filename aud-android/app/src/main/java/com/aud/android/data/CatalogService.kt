@@ -45,7 +45,7 @@ object CatalogService {
     private const val CACHE_PREFS = "aud_catalog_cache"
     private const val CACHE_KEY = "catalog_v3"
     private const val CACHE_TTL_MS = 20L * 60L * 1000L
-    private const val CACHE_VERSION = 3
+    private const val CACHE_VERSION = 4
 
     /** Per-bucket per-language row cap — keeps one huge result set from swamping the rest. */
     private const val MAX_PER_LANGUAGE = 8
@@ -87,6 +87,28 @@ object CatalogService {
         const val WORLD = "world"
         const val CHARTS = "charts"
     }
+
+    /**
+     * "Your Sound Universe" — six mood tiles, each a live Tamil-first query.
+     * The keys are stable so the home page can open the right one.
+     */
+    val MOODS: List<Pair<String, String>> = listOf(
+        "chill" to "Chill",
+        "romance" to "Romance",
+        "heartbreak" to "Heartbreak",
+        "workout" to "Workout",
+        "focus" to "Focus",
+        "travel" to "Travel",
+    )
+
+    private val MOOD_QUERIES: Map<String, String> = mapOf(
+        "chill" to "tamil chill melody songs",
+        "romance" to "tamil romance love duet",
+        "heartbreak" to "tamil heartbreak sad songs",
+        "workout" to "tamil workout energy mass beat",
+        "focus" to "tamil instrumental focus music",
+        "travel" to "tamil travel melody road trip",
+    )
 
     private val TAMIL_LANGS = setOf("tamil")
     private val INDIAN_LANGS = setOf("hindi", "telugu", "malayalam", "kannada", "punjabi", "bengali", "marathi")
@@ -164,7 +186,12 @@ object CatalogService {
         add(Seed("K-Pop Wave", "kpop hits", Tier.WORLD, emptySet(), ShelfKey.WORLD, "Around the world", 14))
         add(Seed("Afrobeats", "afrobeats hits", Tier.WORLD, emptySet(), ShelfKey.WORLD, "Around the world", 12))
 
-        /* 11 ── Chart-only buckets (feed the trending list, never their own shelf) */
+        /* 11 ── Mood buckets — one per "Sound Universe" tile (Tamil-first) */
+        MOODS.forEach { (key, _) ->
+            add(Seed("Mood: $key", MOOD_QUERIES.getValue(key), Tier.TAMIL, TAMIL_LANGS, "mood_$key", "Mood", 10))
+        }
+
+        /* 12 ── Chart-only buckets (feed the trending list, never their own shelf) */
         add(Seed("Tamil Top 50", "tamil top 50 songs", Tier.TAMIL, TAMIL_LANGS, null, weight = 40))
         add(Seed("India Top 50", "india top 50 songs", Tier.INDIA, INDIAN_LANGS, null, weight = 20))
         add(Seed("World Top 50", "global top 50 songs", Tier.WORLD, emptySet(), null, weight = 10))
@@ -256,7 +283,97 @@ object CatalogService {
         }
 
         val shelves = buildShelves(mixes, chartPool.values.toList())
-        return Catalog(allTracks, mixes, shelves, now)
+        val moods = buildMoods(mixes)
+        val tasteMixes = buildTasteMixes(mixes, moods, allTracks)
+        return Catalog(
+            tracks = allTracks,
+            mixes = mixes,
+            shelves = shelves,
+            fetchedAtMs = now,
+            moodList = moods,
+            tasteMixes = tasteMixes,
+        )
+    }
+
+    /** One live row of tracks per mood tile, in the UI's order. */
+    private fun buildMoods(mixes: List<Mix>): List<Mood> {
+        val byTitle = mixes.associateBy { it.title }
+        return MOODS.map { (key, label) ->
+            val tracks = byTitle["Mood: $key"]?.tracks.orEmpty().take(16)
+            Mood(key = key, label = label, query = MOOD_QUERIES.getValue(key), tracks = tracks)
+        }
+    }
+
+    /**
+     * "Made For Your Taste" cards. Each one is assembled from real buckets —
+     * the personal touches (heavier Tamil weighting, chart freshness) live here,
+     * so the row is meaningful even before the listener has any history.
+     */
+    private fun buildTasteMixes(mixes: List<Mix>, moods: List<Mood>, allTracks: List<Track>): List<TasteMix> {
+        val byTitle = mixes.associateBy { it.title }
+        fun tracksOf(vararg titles: String): List<Track> =
+            titles.flatMap { byTitle[it]?.tracks.orEmpty() }.distinctBy { it.id }
+
+        fun mood(key: String): List<Track> = moods.firstOrNull { it.key == key }?.tracks.orEmpty()
+
+        val tamilOnly = allTracks.filter { it.isTamil }
+        val cards = listOf(
+            TasteMix(
+                key = "daily",
+                title = "Daily Mix",
+                subtitle = "Tamil, refreshed every load",
+                tracks = (dailyRotation(tamilOnly)).ifEmpty { tamilOnly }.take(24),
+                accentIndex = 0,
+            ),
+            TasteMix(
+                key = "tamilvibes",
+                title = "Tamil Vibes",
+                subtitle = "Kollywood, front and centre",
+                tracks = tracksOf("Tamil Trending", "Fresh Tamil", "Kollywood 2024", "New Kollywood").take(24),
+                accentIndex = 1,
+            ),
+            TasteMix(
+                key = "moodbooster",
+                title = "Mood Booster",
+                subtitle = "Kuthu, mass and full throttle",
+                tracks = (mood("workout") + tracksOf("Kuthu Anthems", "Mass BGM", "Dance Tamil")).distinctBy { it.id }.take(24),
+                accentIndex = 2,
+            ),
+            TasteMix(
+                key = "chillhits",
+                title = "Chill Hits",
+                subtitle = "Soft melodies for a slow evening",
+                tracks = (mood("chill") + tracksOf("Tamil Love", "Romantic Duets", "Evergreen Tamil Melody")).distinctBy { it.id }.take(24),
+                accentIndex = 3,
+            ),
+            TasteMix(
+                key = "throwback",
+                title = "Throwback Tamil",
+                subtitle = "Ilaiyaraaja, MSV, Rahman, SPB",
+                tracks = tracksOf("Ilaiyaraaja", "M. S. Viswanathan", "A. R. Rahman", "80s & 90s Tamil", "S. P. Balasubrahmanyam").take(24),
+                accentIndex = 4,
+            ),
+            TasteMix(
+                key = "newvoices",
+                title = "New Voices",
+                subtitle = "Tamil indie, rap and the fresh crop",
+                tracks = tracksOf("Tamil Indie", "Tamil Rap", "Independent Tamil").take(24),
+                accentIndex = 5,
+            ),
+        )
+        return cards.filter { it.trackCount >= 6 }
+    }
+
+    /**
+     * A stable daily rotation: the same listener sees the same Daily Mix all day,
+     * and a different one tomorrow — no randomness inside a session.
+     */
+    private fun dailyRotation(tamil: List<Track>): List<Track> {
+        if (tamil.isEmpty()) return emptyList()
+        val day = (System.currentTimeMillis() / 86_400_000L).toInt()
+        val rotated = tamil.sortedBy { Math.floorMod(it.id.hashCode() + day, 997) }
+        return rotated.distinctBy { it.leadArtist.lowercase() }
+            .ifEmpty { tamil }
     }
 
     /** Groups mixes into home-page shelves, Tamil shelves first. */
@@ -266,6 +383,7 @@ object CatalogService {
         for (mix in mixes) {
             val seed = seedByTitle[mix.title] ?: continue
             val key = seed.shelf ?: continue
+            if (key.startsWith("mood_")) continue      // moods get their own row
             byShelf.getOrPut(key) { mutableListOf() } += seed to mix
         }
 
@@ -462,12 +580,43 @@ object CatalogService {
                 )
             }
 
+            fun idsOf(tracks: List<Track>): JSONArray {
+                val ids = JSONArray()
+                tracks.forEach { ids.put(it.id) }
+                return ids
+            }
+
+            val moodsJson = JSONArray()
+            catalog.moodList.forEach { mood ->
+                moodsJson.put(
+                    JSONObject()
+                        .put("key", mood.key)
+                        .put("label", mood.label)
+                        .put("query", mood.query)
+                        .put("trackIds", idsOf(mood.tracks))
+                )
+            }
+
+            val tasteJson = JSONArray()
+            catalog.tasteMixes.forEach { mix ->
+                tasteJson.put(
+                    JSONObject()
+                        .put("key", mix.key)
+                        .put("title", mix.title)
+                        .put("sub", mix.subtitle)
+                        .put("accent", mix.accentIndex)
+                        .put("trackIds", idsOf(mix.tracks))
+                )
+            }
+
             val root = JSONObject()
                 .put("v", CACHE_VERSION)
                 .put("ts", catalog.fetchedAtMs)
                 .put("tracks", tracksJson)
                 .put("mixes", mixesJson)
                 .put("shelves", shelvesJson)
+                .put("moods", moodsJson)
+                .put("taste", tasteJson)
 
             context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
                 .putString(CACHE_KEY, root.toString())
@@ -529,7 +678,39 @@ object CatalogService {
                     tracks = shelfTracks,
                 )
             }
-            Catalog(tracks, mixes, shelves, ts)
+            val moods = ArrayList<Mood>()
+            val moodObjects = root.optJSONArray("moods") ?: JSONArray()
+            for (i in 0 until moodObjects.length()) {
+                val o = moodObjects.getJSONObject(i)
+                val ids = o.optJSONArray("trackIds") ?: continue
+                val rows = ArrayList<Track>()
+                for (j in 0 until ids.length()) byId[ids.getString(j)]?.let { rows += it }
+                moods += Mood(
+                    key = o.optString("key"),
+                    label = o.optString("label"),
+                    query = o.optString("query"),
+                    tracks = rows,
+                )
+            }
+
+            val tasteMixes = ArrayList<TasteMix>()
+            val tasteObjects = root.optJSONArray("taste") ?: JSONArray()
+            for (i in 0 until tasteObjects.length()) {
+                val o = tasteObjects.getJSONObject(i)
+                val ids = o.optJSONArray("trackIds") ?: continue
+                val rows = ArrayList<Track>()
+                for (j in 0 until ids.length()) byId[ids.getString(j)]?.let { rows += it }
+                if (rows.isEmpty()) continue
+                tasteMixes += TasteMix(
+                    key = o.optString("key"),
+                    title = o.optString("title"),
+                    subtitle = o.optString("sub"),
+                    tracks = rows,
+                    accentIndex = o.optInt("accent", 0),
+                )
+            }
+
+            Catalog(tracks, mixes, shelves, ts, moods, tasteMixes)
         }.getOrNull()
     }
 }

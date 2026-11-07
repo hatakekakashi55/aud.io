@@ -23,17 +23,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -51,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,12 +116,14 @@ fun AudApp(
     val playback by player.state.collectAsStateWithLifecycle()
     var likedIds by remember { mutableStateOf(store.likedIds()) }
     var fullPlayerOpen by remember { mutableStateOf(false) }
-    var tab by rememberSaveable { mutableStateOf(NOW) }
+    var tab by rememberSaveable { mutableStateOf(HOME) }
     var artist by rememberSaveable { mutableStateOf<String?>(null) }
+    var moodKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     val currentId = playback.current?.id
     val recentIds = remember(currentId, feedVersion) { store.recentIds() }
     val isFreshProfile = remember(feedVersion) { store.isFreshProfile() }
+    var displayName by remember { mutableStateOf(store.displayName()) }
 
     // The player records the spin once the stream is live; give it a beat, then re-rank.
     LaunchedEffect(currentId) {
@@ -154,7 +161,16 @@ fun AudApp(
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f)) {
                         val openArtist = artist
+                        val openMood = moodKey?.let { key -> catalog.moodList.firstOrNull { it.key == key } }
                         when {
+                            openMood != null -> MoodScreen(
+                                mood = openMood,
+                                currentTrackId = currentId,
+                                isPlaying = playback.isPlaying,
+                                onPlay = onPlay,
+                                onBack = { moodKey = null },
+                                bottomPadding = 0.dp,
+                            )
                             openArtist != null -> ArtistScreen(
                                 artist = openArtist,
                                 catalog = catalog,
@@ -164,15 +180,28 @@ fun AudApp(
                                 onBack = { artist = null },
                                 bottomPadding = 0.dp,
                             )
-                            tab == NOW -> NowScreen(
+                            tab == HOME -> NowScreen(
                                 catalog = catalog,
                                 forYou = forYou,
                                 currentTrackId = currentId,
                                 isPlaying = playback.isPlaying,
                                 isFreshProfile = isFreshProfile,
                                 becauseYou = becauseYou,
+                                progressFraction = if (playback.durationSec > 0)
+                                    playback.positionSec.toFloat() / playback.durationSec.toFloat() else 0f,
+                                displayName = displayName,
+                                likedIds = likedIds,
                                 onPlay = onPlay,
+                                onPlayPause = {
+                                    if (playback.hasTrack) player.toggle()
+                                    else if (forYou.isNotEmpty()) player.playQueue(forYou, 0)
+                                },
                                 onOpenArtist = { artist = it },
+                                onOpenMood = { mood -> moodKey = mood.key },
+                                onOpenSearch = { tab = FIND },
+                                onOpenSettings = { tab = PROFILE },
+                                onToggleLike = onToggleLike,
+                                onOpenTrack = { track -> player.playQueue(listOf(track), 0) },
                                 bottomPadding = 0.dp,
                             )
                             tab == FIND -> SearchScreen(
@@ -191,13 +220,24 @@ fun AudApp(
                                 onPlay = onPlay,
                                 bottomPadding = 0.dp,
                             )
-                            tab == SETTINGS -> SettingsScreen(
+                            tab == PLAY -> PlaylistScreen(
+                                catalog = catalog,
+                                currentTrackId = currentId,
+                                isPlaying = playback.isPlaying,
+                                onPlay = onPlay,
+                                bottomPadding = 0.dp,
+                            )
+                            tab == PROFILE -> SettingsScreen(
                                 catalog = catalog,
                                 store = store,
                                 appearance = appearance,
                                 libraryVersion = feedVersion,
                                 onAppearanceChange = onAppearanceChange,
                                 onFeedReset = { resetSignal++ },
+                                onDisplayNameChange = { newName ->
+                                    store.setDisplayName(newName)
+                                    displayName = store.displayName()
+                                },
                                 bottomPadding = 0.dp,
                             )
                         }
@@ -207,6 +247,7 @@ fun AudApp(
                             playback = playback,
                             liked = playback.current?.id?.let { it in likedIds } == true,
                             onToggleLike = { currentId?.let(onToggleLike) },
+                            onPrevious = player::previous,
                             onNext = player::next,
                             onToggle = player::toggle,
                             onExpand = { fullPlayerOpen = true },
@@ -216,6 +257,7 @@ fun AudApp(
                         active = tab,
                         onSelect = {
                             artist = null
+                            moodKey = null
                             tab = it
                         },
                     )
@@ -255,18 +297,20 @@ fun AudApp(
     }
 }
 
-private const val NOW = "now"
+private const val HOME = "home"
 private const val FIND = "find"
 private const val SHELF = "shelf"
-private const val SETTINGS = "settings"
+private const val PLAY = "play"
+private const val PROFILE = "profile"
 
-/* ── Mini player — 2dp accent progress hairline on top ── */
+/* ── Mini player — floating card above the nav, with a slim progress line ── */
 
 @Composable
 private fun MiniPlayer(
     playback: com.aud.android.player.PlaybackState,
     liked: Boolean,
     onToggleLike: () -> Unit,
+    onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToggle: () -> Unit,
     onExpand: () -> Unit,
@@ -277,100 +321,122 @@ private fun MiniPlayer(
 
     Surface(
         color = Ink.Raised,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .border(1.dp, Ink.Line, RoundedCornerShape(14.dp)),
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .border(1.dp, Ink.Line, RoundedCornerShape(18.dp)),
     ) {
-        Box {
-            Column {
-                Box(Modifier.fillMaxWidth().height(2.dp).background(Ink.Line)) {
-                    Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Ink.Brass))
-                }
-                Row(
+        Column {
+            /* Slim progress hairline across the very top of the card */
+            Box(Modifier.fillMaxWidth().height(2.dp).background(Ink.Line)) {
+                Box(Modifier.fillMaxWidth(fraction).height(2.dp).background(Ink.Brass))
+            }
+            Row(
+                Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                /* Expand chevron */
+                Box(
                     Modifier
-                        .clickable(onClick = onExpand)
-                        .padding(horizontal = 10.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onExpand),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Artwork(track.imageUrl, track.title, Modifier.size(52.dp), corner = 11.dp, decodeSize = 160)
-                    Spacer(Modifier.width(11.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "NOW SPINNING",
-                            color = Ink.Brass,
-                            fontFamily = Mono,
-                            fontSize = 6.5.sp,
-                            letterSpacing = 1.6.sp,
-                        )
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            track.title,
-                            color = Ink.Parchment,
-                            fontFamily = Serif,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.5.sp,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            "${track.shortArtists.uppercase()}  ·  ${if (track.isTamil) "தமிழ்" else if (track.releaseYear > 0) "${track.releaseYear}" else track.language.uppercase()}",
-                            color = Ink.Muted,
-                            fontFamily = Mono,
-                            fontSize = 7.5.sp,
-                            letterSpacing = 0.7.sp,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        )
-                    }
                     Icon(
-                        if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = "Like",
-                        tint = if (liked) Ink.Brass else Ink.Muted,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clickable(onClick = onToggleLike)
-                            .padding(7.dp),
-                    )
-                    Icon(
-                        Icons.Rounded.SkipNext,
-                        contentDescription = "Next",
+                        Icons.Rounded.ExpandLess,
+                        contentDescription = "Open player",
                         tint = Ink.Muted,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clickable(onClick = onNext)
-                            .padding(6.dp),
+                        modifier = Modifier.size(16.dp),
                     )
-                    if (playback.isPreparing) {
+                }
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.clickable(onClick = onExpand)) {
+                    Artwork(track.imageUrl, track.title, Modifier.size(46.dp), corner = 11.dp, decodeSize = 160)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clickable(onClick = onExpand),
+                ) {
+                    Text(
+                        track.title,
+                        color = Ink.Parchment,
+                        fontFamily = Sans,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        track.shortArtists,
+                        color = Ink.Muted,
+                        fontFamily = Sans,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(
+                    if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    contentDescription = if (liked) "Unlike" else "Like",
+                    tint = if (liked) Ink.Brass else Ink.Muted,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable(onClick = onToggleLike)
+                        .padding(8.dp),
+                )
+                Icon(
+                    Icons.Rounded.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = Ink.Muted,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable(onClick = onPrevious),
+                )
+                if (playback.isPreparing) {
+                    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp).padding(5.dp),
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp,
                             color = Ink.Brass,
                         )
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Ink.Brass,
-                            modifier = Modifier.size(38.dp).clickable(onClick = onToggle),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                                    tint = Ink.OnBrass,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                            }
-                        }
+                    }
+                } else {
+                    Box(
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Ink.Parchment)
+                            .clickable(onClick = onToggle),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (playback.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (playback.isPlaying) "Pause" else "Play",
+                            tint = Ink.Background,
+                            modifier = Modifier.size(24.dp),
+                        )
                     }
                 }
+                Icon(
+                    Icons.Rounded.SkipNext,
+                    contentDescription = "Next",
+                    tint = Ink.Muted,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable(onClick = onNext)
+                        .padding(6.dp),
+                )
             }
         }
     }
 }
 
-/* ── Bottom bar — NOW · FIND · SHELF · YOU with an accent tick ── */
+/* ── Bottom bar — Home · Explore · Library · Playlists · Profile ── */
 
 @Composable
 private fun BottomBar(active: String, onSelect: (String) -> Unit) {
@@ -385,10 +451,11 @@ private fun BottomBar(active: String, onSelect: (String) -> Unit) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BottomItem(NOW, "NOW", Icons.Rounded.Radio, active, onSelect)
-                BottomItem(FIND, "FIND", Icons.Rounded.Search, active, onSelect)
-                BottomItem(SHELF, "SHELF", Icons.Rounded.LibraryMusic, active, onSelect)
-                BottomItem(SETTINGS, "YOU", Icons.Rounded.Settings, active, onSelect)
+                BottomItem(HOME, "Home", Icons.Rounded.Home, active, onSelect)
+                BottomItem(FIND, "Explore", Icons.Rounded.Explore, active, onSelect)
+                BottomItem(SHELF, "Library", Icons.Rounded.LibraryMusic, active, onSelect)
+                BottomItem(PLAY, "Playlists", Icons.Rounded.PlaylistPlay, active, onSelect)
+                BottomItem(PROFILE, "Profile", Icons.Rounded.Person, active, onSelect)
             }
         }
     }
@@ -408,12 +475,19 @@ private fun BottomItem(
     Column(
         Modifier
             .clickable { onSelect(tab) }
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(23.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, color = tint, fontFamily = Mono, fontSize = 8.sp, letterSpacing = 1.7.sp)
+        Text(
+            label,
+            color = tint,
+            fontFamily = Sans,
+            fontWeight = FontWeight.Medium,
+            fontSize = 9.5.sp,
+            maxLines = 1,
+        )
         Spacer(Modifier.height(3.dp))
         Box(
             Modifier

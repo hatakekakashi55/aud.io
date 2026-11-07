@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -62,6 +64,7 @@ fun SettingsScreen(
     libraryVersion: Int,
     onAppearanceChange: (Appearance) -> Unit,
     onFeedReset: () -> Unit,
+    onDisplayNameChange: (String) -> Unit,
     bottomPadding: Dp,
 ) {
     // Recomputed whenever a reset or a spin changes the library version.
@@ -81,6 +84,80 @@ fun SettingsScreen(
                 title = "Make it yours",
                 subtitle = "The feed, and how the page looks at 1 a.m.",
             )
+        }
+
+        /* ── Profile block — the name on the masthead ── */
+        item(key = "profile-card") {
+            var name by remember { mutableStateOf(store.displayName()) }
+            Column(
+                Modifier
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Ink.Paper)
+                    .border(1.dp, Ink.Line, RoundedCornerShape(16.dp))
+                    .padding(18.dp),
+            ) {
+                Text(
+                    "YOUR NAME",
+                    color = Ink.Faint,
+                    fontFamily = Mono,
+                    fontSize = 8.5.sp,
+                    letterSpacing = 2.sp,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Ink.Raised)
+                            .border(1.dp, Ink.Line, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            name.firstOrNull()?.uppercaseChar()?.toString() ?: "A",
+                            color = Ink.Brass,
+                            fontFamily = Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    BasicTextField(
+                        value = name,
+                        onValueChange = {
+                            if (it.length <= 24) {
+                                name = it
+                                onDisplayNameChange(it)
+                            }
+                        },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = Ink.Parchment,
+                            fontFamily = Sans,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp,
+                        ),
+                        cursorBrush = SolidColor(Ink.Brass),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${name.length}/24",
+                        color = Ink.Faint,
+                        fontFamily = Mono,
+                        fontSize = 8.sp,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Shown on the home page greeting. Stays on this device.",
+                    color = Ink.Faint,
+                    fontFamily = Mono,
+                    fontSize = 8.sp,
+                    lineHeight = 12.sp,
+                )
+            }
         }
 
         /* ── Feed block ── */

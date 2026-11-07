@@ -77,6 +77,8 @@ data class Catalog(
     val mixes: List<Mix>,
     val shelves: List<Shelf>,
     val fetchedAtMs: Long,
+    val moodList: List<Mood> = emptyList(),
+    val tasteMixes: List<TasteMix> = emptyList(),
 ) {
     val tamilTracks: List<Track> get() = tracks.filter { it.isTamil }
     val tamilShare: Float
@@ -85,4 +87,45 @@ data class Catalog(
     companion object {
         val Empty = Catalog(emptyList(), emptyList(), emptyList(), 0L)
     }
+}
+
+/* ── Home page building blocks (mirrors the SonicWave-style layout) ── */
+
+/**
+ * A mood tile in "Your Sound Universe". [query] is fired live against the
+ * service, Tamil-first, so every tile is real catalogue — never decoration.
+ */
+@Immutable
+data class Mood(
+    val key: String,
+    val label: String,
+    val query: String,
+    val tamilFirst: Boolean = true,
+    val tracks: List<Track> = emptyList(),
+) {
+    val isEmpty: Boolean get() = tracks.isEmpty()
+    val hasContent: Boolean get() = !isEmpty
+}
+
+/**
+ * A "Made For Your Taste" cover-flow card (Daily Mix, Tamil Vibes, …).
+ * [accentIndex] picks a muted two-tone gradient so no artwork is needed.
+ */
+@Immutable
+data class TasteMix(
+    val key: String,
+    val title: String,
+    val subtitle: String,
+    val tracks: List<Track>,
+    val accentIndex: Int,
+) {
+    val trackCount: Int get() = tracks.size
+}
+
+/** Short "Good Evening" style greeting for the masthead. */
+fun greetingFor(hour: Int): String = when (hour) {
+    in 5..11 -> "Good Morning"
+    in 12..16 -> "Good Afternoon"
+    in 17..21 -> "Good Evening"
+    else -> "Still Up"
 }

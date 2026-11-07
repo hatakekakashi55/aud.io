@@ -61,6 +61,23 @@ object Ink {
     val Faint: Color
         get() = if (contrast) Color(0xFF9EAAA7) else Color(0xFF7C8987)
 
+    /* ── Home-page tints ──────────────────────────────────────────
+     * The reference layout is built from saturated neon tiles. Each of those
+     * hues has a muted, low-chroma equivalent here — same silhouette, none of
+     * the glare. All pairs stay under ~18 % saturation so a tile never blooms
+     * against the dark page, and the label text on them clears 4.5:1.
+     */
+    val TileChill = listOf(Color(0xFF2A3B44), Color(0xFF1E2B33))
+    val TileRomance = listOf(Color(0xFF3E2F3A), Color(0xFF2C222B))
+    val TileHeartbreak = listOf(Color(0xFF2B3444), Color(0xFF1F2735))
+    val TileWorkout = listOf(Color(0xFF3E342A), Color(0xFF2C251E))
+    val TileFocus = listOf(Color(0xFF2A3B36), Color(0xFF1E2B28))
+    val TileTravel = listOf(Color(0xFF2F3A44), Color(0xFF222A33))
+
+    /** Half-tint used behind the masthead — a dusk sky, not a nebula. */
+    val HeroTop = Color(0xFF1D2C2C)
+    val HeroMid = Color(0xFF172022)
+
     /* ── Support ── */
     val Signal = Color(0xFFD8A05F)       // warm amber, used sparingly (live / status)
     val Error = Color(0xFFE08A7D)        // soft clay — never alarm red
